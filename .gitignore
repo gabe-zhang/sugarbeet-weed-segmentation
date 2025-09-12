@@ -1,7 +1,8 @@
 # Folders
 models/
 prediction/
-
+config/
+scripts/
 
 # Files
 **.pyc

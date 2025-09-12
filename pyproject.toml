@@ -1,0 +1,15 @@
+[project]
+name = "semantic-segmentation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9.22"
+dependencies = [
+    "numpy==1.23.0",
+    "oyaml>=1.0",
+    "pytorch-lightning==1.6.2",
+    "scikit-image>=0.24.0",
+    "torchmetrics==0.10.3",
+    "torchvision>=0.23.0",
+    "wget>=3.2",
+]
