@@ -3,6 +3,8 @@ models/
 prediction/
 config/
 scripts/
+data/
+.vscode
 
 # Files
 **.pyc
