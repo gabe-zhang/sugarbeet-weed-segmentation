@@ -82,6 +82,7 @@ class MyDataset(Dataset):
 
         img_before_norm = img.clone()
         img = self.img_normalizer.normalize(img)
+        # img = self.img_normalizer.normalize(img).half()
 
         # return img
         return {
