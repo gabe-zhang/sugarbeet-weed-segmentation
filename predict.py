@@ -1,15 +1,23 @@
-""" Validate semantic segmentation model.
+""" Predict with semantic segmentation model.
 """
 import argparse
 import os
+import time
 from typing import Dict
 
 import oyaml as yaml
-from pytorch_lightning import Trainer
-
+import pytorch_lightning as pl
+import torch
+import torch_tensorrt  # noqa: F401
+from callbacks import (
+    PostprocessorrCallback,
+    VisualizerCallback,
+    get_postprocessors,
+    get_visualizers,
+)
 from datasets import get_data_module
 from modules import get_backbone, get_criterion, module
-from callbacks import get_visualizers, VisualizerCallback, get_postprocessors, PostprocessorrCallback
+from pytorch_lightning import Trainer
 
 
 def parse_args() -> Dict[str, str]:
@@ -40,7 +48,18 @@ def main():
     criterion = get_criterion(cfg)
 
     # define backbone
-    network = get_backbone(cfg)
+    # network = get_backbone(cfg)
+
+    class NetworkWrapper():
+        def __init__(self, network, num_classes=3):
+            self.network = network
+            self.num_classes = num_classes
+        
+        def forward(self, image):
+            return self.network.forward(image)
+    network = torch.jit.load("models/erfnet_tensorrt.ts")
+    network = NetworkWrapper(network)
+
 
     seg_module = module.SegmentationNetwork(network, 
                                             criterion, 
@@ -57,9 +76,14 @@ def main():
     trainer = Trainer(
         gpus=cfg['predict']['n_gpus'],
         default_root_dir=args['export_dir'],
+        max_epochs=cfg['train']['max_epoch'],
         callbacks=[visualizer_callback, postprocessor_callback])
-    trainer.predict(seg_module, dataloaders=datasetmodule, ckpt_path=args['ckpt_path'])
-
+    start = time.time()
+    # trainer.predict(seg_module, dataloaders=datasetmodule, ckpt_path=args['ckpt_path'])
+    trainer.predict(seg_module, dataloaders=datasetmodule)
+    total_time = time.time() - start
+    print(f"{round(total_time / len(datasetmodule), 2)}s per image:"
+          f"{round(total_time, 2)}s for {len(datasetmodule)} images.")
 
 if __name__ == '__main__':
     main()
