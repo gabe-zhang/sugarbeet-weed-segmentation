@@ -1,46 +1,131 @@
-# Semantic Segmentation
+# Semantic Segmentation for Weed Detection
+
+A semantic segmentation framework for agricultural weed detection in **sugarbeet** fields, classifying pixels into three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
+
+> **Note**: This model is trained specifically on sugarbeet imagery from the PhenoBench dataset and is not designed for other crop types.
+
+## Attribution
+
+This project is based on [PRBonn/phenobench-baselines](https://github.com/PRBonn/phenobench-baselines/tree/main/semantic_segmentation) and uses the [PhenoBench dataset](https://www.phenobench.org/). The original codebase has been modified for custom training, edge deployment, and testing purposes.
+
+If you use this code, please cite the original PhenoBench work and the respective model architectures (see [CITATION.md](CITATION.md)).
+
+## Branches
+
+| Branch | Target Platform | Python | Description |
+|--------|-----------------|--------|-------------|
+| `main` | Desktop / Cloud GPU | 3.9+ | Full training and inference with `uv` managed dependencies |
+| `brain` | NVIDIA Jetson Xavier NX | 3.8 | Edge deployment with TensorRT optimization |
+
+### Main Branch
+- Full dependency management via `uv add`
+- Training, validation, and inference scripts
+- Supports ERFNet, DeepLabV3+, and UNet architectures
+
+### Brain Branch
+- Dependencies managed via `uv pip install` with `--system-site-packages`
+- TensorRT model conversion ([conversion.ipynb](conversion.ipynb))
+- Benchmark script for PyTorch vs TensorRT comparison ([benchmark.py](benchmark.py))
+- Optimized for real-time inference on edge devices
 
 ## Setup
-```bash
-conda create -n phenobench_semseg python=3.8
-conda activate phenobench_semseg
-pip install -r ./setup/requirements.txt
-pip3 install torch==1.10.1+cu113 torchvision==0.11.2+cu113 torchaudio==0.10.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
-pip install setuptools==59.5.0
-```
-Please note that the cuda version depends on your local machine.
 
-Next, change the path to the dataset in the following configuration files
+### Main Branch (Desktop/Cloud)
+
+```bash
+# Clone and enter directory
+cd sugarbeet-weed-segmentation
+
+# Install dependencies with uv
+uv sync
+```
+
+### Brain Branch (Jetson Xavier NX)
+
+```bash
+# Ensure system packages are available (CUDA, TensorRT, PyTorch)
+# Then install Python dependencies
+uv venv --system-site-packages
+uv pip install -r requirements.txt
+```
+
+### Dataset Configuration
+
+Update the dataset path in the configuration files:
 ```bash
 ./config/config_erfnet.yaml
 ./config/config_deeplab.yaml
 ```
 
-## Train ERFNet
+## Project Structure
 
-```python 
-python train.py --config ./config/config_erfnet.yaml --export_dir <path-to-export-directory>
+```
+sugarbeet-weed-segmentation/
+├── src/              # Entry point scripts
+│   ├── train.py      # Training script
+│   ├── test.py       # Testing script
+│   ├── val.py        # Validation script
+│   ├── predict.py    # Prediction script
+│   └── inference.py  # Inference script
+├── config/           # YAML configurations
+├── models/           # Pretrained checkpoints
+├── modules/          # Model architectures (ERFNet, DeepLabV3+, UNet)
+├── datasets/         # Data loaders and augmentations
+├── callbacks/        # Training callbacks
+├── scripts/          # Shell scripts
+│   └── val.sh        # Validation runner
+└── tools/            # Python utility scripts
+    ├── calculate_class_weights.py
+    ├── calculate_means_stds.py
+    └── visualize.py
 ```
 
-## Train DeepLabV3+
+## Usage
 
-```python 
-python train.py --config ./config/config_deeplab.yaml --export_dir <path-to-export-directory>
+### Train ERFNet
+
+```bash
+uv run src/train.py --config ./config/config_erfnet.yaml --export_dir <path-to-export-directory>
 ```
 
-## Test ERFNet
+### Train DeepLabV3+
 
-```python
-python test.py --config ./config/config_erfnet.yaml --ckpt_path <path-to-export-ckpt> --export_dir <path-to-export-directory>
+```bash
+uv run src/train.py --config ./config/config_deeplab.yaml --export_dir <path-to-export-directory>
 ```
 
-## Test DeepLabV3+
+### Test
 
-```python
-python test.py --config ./config/config_deeplab.yaml --ckpt_path <path-to-export-ckpt> --export_dir <path-to-export-directory>
+```bash
+uv run src/test.py --config ./config/config_erfnet.yaml --ckpt_path <path-to-ckpt> --export_dir <path-to-export-directory>
 ```
 
-## Pretrained Model
-We provide the weights of pretrained models:
-- Please find the weights of ERFNet [here](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-erfnet.ckpt)
-- Please find the weights of DeepLabV3+ [here](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-deeplab.ckpt)
+### Inference
+
+```bash
+uv run src/predict.py --config ./config/config_erfnet.yaml --ckpt_path <path-to-ckpt> --export_dir <path-to-export-directory>
+```
+
+### Benchmark (Brain Branch Only)
+
+```bash
+uv run src/benchmark.py --config config/erfnet_predict.yaml --num_warmup 10 --num_runs 100
+```
+
+## Pretrained Models
+
+Pretrained weights from PRBonn:
+- [ERFNet](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-erfnet.ckpt) (24 MB)
+- [DeepLabV3+](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-deeplab.ckpt) (456 MB)
+
+## Classes
+
+| Class | ID | Color (RGB) |
+|-------|------|-------------|
+| Soil (background) | 0 | (0, 0, 0) |
+| Crop (sugarbeet) | 1 | (0, 255, 0) |
+| Weed | 2 | (255, 0, 0) |
+
+## License
+
+Please refer to the [original repository](https://github.com/PRBonn/phenobench-baselines) for licensing information.
