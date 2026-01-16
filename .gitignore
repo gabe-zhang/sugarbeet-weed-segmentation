@@ -1,11 +1,10 @@
 # Folders
+__pycache__
 models/
 prediction/
-config/
 data/
 .vscode
 
 # Files
 **.pyc
 TODO.md
-scripts/val.sh
