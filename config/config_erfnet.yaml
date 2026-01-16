@@ -3,7 +3,7 @@ experiment:
   id: phenobench
 data:
   name: phenobench
-  path_to_dataset: /home/zy/proj/weed-detect/data/PhenoBench
+  path_to_dataset: ./data/PhenoBench
   num_workers: 0
   image_normalizer:
     name: single_image_normalizer
