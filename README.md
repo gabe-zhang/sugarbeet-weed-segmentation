@@ -1,4 +1,4 @@
-# Semantic Segmentation for Weed Detection
+# Sugarbeet Weed Segmentation
 
 A semantic segmentation framework for agricultural weed detection in **sugarbeet** fields, classifying pixels into three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
 
