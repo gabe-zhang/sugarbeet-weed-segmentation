@@ -6,7 +6,7 @@ A semantic segmentation framework for agricultural weed detection in **sugarbeet
 
 ## Attribution
 
-This project is based on [PRBonn/phenobench-baselines](https://github.com/PRBonn/phenobench-baselines/tree/main/semantic_segmentation) and uses the [PhenoBench dataset](https://www.phenobench.org/). The original codebase has been modified for custom training, edge deployment, and testing purposes.
+This project is based on [PRBonn/phenobench-baselines](https://github.com/PRBonn/phenobench-baselines/tree/main/semantic_segmentation) and uses the [PhenoBench dataset](https://www.phenobench.org/) (licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)). The original codebase has been modified for custom training, edge deployment, and testing purposes.
 
 If you use this code, please cite the original PhenoBench work and the respective model architectures (see [CITATION.md](CITATION.md)).
 
@@ -34,6 +34,7 @@ If you use this code, please cite the original PhenoBench work and the respectiv
 
 ```bash
 # Clone and enter directory
+git clone https://github.com/gabe-zhang/sugarbeet-weed-segmentation.git
 cd sugarbeet-weed-segmentation
 
 # Install dependencies with uv
@@ -128,4 +129,4 @@ Pretrained weights from PRBonn:
 
 ## License
 
-Please refer to the [original repository](https://github.com/PRBonn/phenobench-baselines) for licensing information.
+This project is licensed under the [MIT License](LICENSE).
