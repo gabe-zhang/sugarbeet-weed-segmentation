@@ -7,11 +7,10 @@ erfnet_half_tensorrt.ts (FP16)
 import argparse
 import os
 import sys
-import time
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import oyaml as yaml
 import torch
@@ -35,16 +34,18 @@ def parse_args() -> Dict[str, str]:
         help="Number of warm-up iterations",
     )
     parser.add_argument(
-        "--num_runs",
+        "--num_passes",
         type=int,
-        default=100,
-        help="Number of inference runs for timing",
+        default=1,
+        help="Number of passes over the dataset for robust timing",
     )
     return vars(parser.parse_args())
 
 
 def load_config(path_to_config_file: str) -> Dict:
-    assert os.path.exists(path_to_config_file), f"Config not found: {path_to_config_file}"
+    assert os.path.exists(path_to_config_file), (
+        f"Config not found: {path_to_config_file}"
+    )
     with open(path_to_config_file) as istream:
         config = yaml.safe_load(istream)
     return config
@@ -122,56 +123,12 @@ def warmup(
     torch.cuda.synchronize()
 
 
-def benchmark_model(
-    model: torch.nn.Module,
-    dataloader: torch.utils.data.DataLoader,
-    device: torch.device,
-    num_runs: int,
-    use_half: bool = False,
-) -> Dict[str, float]:
-    """Benchmark a model using CUDA events for accurate GPU timing."""
-    # Get a sample batch for shape
-    sample_batch = next(iter(dataloader))
-    input_tensor = sample_batch["input_image"].to(device)
-    if use_half:
-        input_tensor = input_tensor.half()
-
-    # Create CUDA events for timing
-    start_event = torch.cuda.Event(enable_timing=True)
-    end_event = torch.cuda.Event(enable_timing=True)
-
-    times = []
-
-    with torch.no_grad():
-        for i in range(num_runs):
-            # Synchronize before starting timer
-            torch.cuda.synchronize()
-            start_event.record()
-
-            _ = model(input_tensor)
-
-            end_event.record()
-            torch.cuda.synchronize()
-
-            elapsed_ms = start_event.elapsed_time(end_event)
-            times.append(elapsed_ms)
-
-    # Calculate statistics
-    times_tensor = torch.tensor(times)
-    return {
-        "mean_ms": float(times_tensor.mean()),
-        "std_ms": float(times_tensor.std()),
-        "min_ms": float(times_tensor.min()),
-        "max_ms": float(times_tensor.max()),
-        "fps": 1000.0 / float(times_tensor.mean()),
-    }
-
-
 def benchmark_on_dataset(
     model: torch.nn.Module,
     dataloader: torch.utils.data.DataLoader,
     device: torch.device,
     use_half: bool = False,
+    num_passes: int = 1,
 ) -> Dict[str, float]:
     """Benchmark model on actual dataset images."""
     start_event = torch.cuda.Event(enable_timing=True)
@@ -181,21 +138,22 @@ def benchmark_on_dataset(
     num_images = 0
 
     with torch.no_grad():
-        for batch in dataloader:
-            input_tensor = batch["input_image"].to(device)
-            if use_half:
-                input_tensor = input_tensor.half()
+        for _ in range(num_passes):
+            for batch in dataloader:
+                input_tensor = batch["input_image"].to(device)
+                if use_half:
+                    input_tensor = input_tensor.half()
 
-            torch.cuda.synchronize()
-            start_event.record()
+                torch.cuda.synchronize()
+                start_event.record()
 
-            _ = model(input_tensor)
+                _ = model(input_tensor)
 
-            end_event.record()
-            torch.cuda.synchronize()
+                end_event.record()
+                torch.cuda.synchronize()
 
-            total_time_ms += start_event.elapsed_time(end_event)
-            num_images += input_tensor.shape[0]
+                total_time_ms += start_event.elapsed_time(end_event)
+                num_images += input_tensor.shape[0]
 
     avg_time_ms = total_time_ms / num_images
     return {
@@ -206,41 +164,27 @@ def benchmark_on_dataset(
     }
 
 
-def print_results(results: Dict[str, Dict[str, float]], title: str) -> None:
+def print_results(results: Dict[str, Dict[str, float]]) -> None:
     """Print benchmark results in a formatted table."""
     print(f"\n{'=' * 70}")
-    print(f"{title:^70}")
+    print(f"{'FULL DATASET INFERENCE':^70}")
     print("=" * 70)
-
-    # Check if results have std_ms (repeated runs) or avg_time_ms (dataset)
-    has_std = any("std_ms" in m for m in results.values())
-
-    if has_std:
-        print(f"{'Model':<20} {'Mean (ms)':<12} {'Std (ms)':<12} {'FPS':<12} {'Speedup':<12}")
-    else:
-        print(f"{'Model':<20} {'Avg (ms)':<12} {'Total (ms)':<12} {'FPS':<12} {'Speedup':<12}")
+    print(
+        f"{'Model':<20} {'Avg (ms)':<12} {'Total (ms)':<12} {'FPS':<12} {'Speedup':<12}"
+    )
     print("-" * 70)
 
     baseline_fps = results.get("pytorch_erfnet", {}).get("fps", 1.0)
 
     for model_name, metrics in results.items():
         speedup = metrics["fps"] / baseline_fps if baseline_fps > 0 else 0
-        if has_std:
-            print(
-                f"{model_name:<20} "
-                f"{metrics['mean_ms']:<12.2f} "
-                f"{metrics.get('std_ms', 0):<12.2f} "
-                f"{metrics['fps']:<12.1f} "
-                f"{speedup:<12.2f}x"
-            )
-        else:
-            print(
-                f"{model_name:<20} "
-                f"{metrics['avg_time_ms']:<12.2f} "
-                f"{metrics.get('total_time_ms', 0):<12.0f} "
-                f"{metrics['fps']:<12.1f} "
-                f"{speedup:<12.2f}x"
-            )
+        print(
+            f"{model_name:<20} "
+            f"{metrics['avg_time_ms']:<12.2f} "
+            f"{metrics.get('total_time_ms', 0):<12.0f} "
+            f"{metrics['fps']:<12.1f} "
+            f"{speedup:<12.2f}x"
+        )
     print("=" * 70)
 
 
@@ -253,7 +197,9 @@ def main():
     print(f"Using device: {device}")
 
     if device.type != "cuda":
-        print("WARNING: CUDA not available. Benchmarking on CPU may not be representative.")
+        print(
+            "WARNING: CUDA not available. Benchmarking on CPU may not be representative."
+        )
 
     # Load dataset
     print("\nLoading dataset...")
@@ -276,40 +222,41 @@ def main():
     print("BENCHMARKING")
     print("=" * 70)
 
-    repeated_results = {}
-    dataset_results = {}
+    results = {}
 
     for model_name, model in models.items():
         print(f"\n[{model_name}]")
         use_half = "fp16" in model_name
 
         # Warm-up with empty input
-        warmup(model, input_shape, device, args["num_warmup"], use_half=use_half)
-
-        # Benchmark with repeated runs on same input
-        print(f"  Running {args['num_runs']} repeated inference runs...")
-        repeated_results[model_name] = benchmark_model(
-            model, dataloader, device, args["num_runs"], use_half=use_half
+        warmup(
+            model, input_shape, device, args["num_warmup"], use_half=use_half
         )
 
         # Benchmark on full dataset
-        print(f"  Running inference on full dataset...")
-        dataset_results[model_name] = benchmark_on_dataset(
-            model, dataloader, device, use_half=use_half
+        print(f"  Running {args['num_passes']} pass(es) on full dataset...")
+        results[model_name] = benchmark_on_dataset(
+            model,
+            dataloader,
+            device,
+            use_half=use_half,
+            num_passes=args["num_passes"],
         )
 
     # Print results
-    print_results(repeated_results, "REPEATED INFERENCE (Same Input)")
-    print_results(dataset_results, "FULL DATASET INFERENCE")
+    print_results(results)
 
     # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    baseline = repeated_results["pytorch_erfnet"]["mean_ms"]
-    for model_name, metrics in repeated_results.items():
-        speedup = baseline / metrics["mean_ms"]
-        print(f"{model_name}: {metrics['mean_ms']:.2f}ms ({speedup:.2f}x vs PyTorch)")
+    baseline = results["pytorch_erfnet"]["avg_time_ms"]
+    for model_name, metrics in results.items():
+        speedup = baseline / metrics["avg_time_ms"]
+        print(
+            f"{model_name}: {metrics['avg_time_ms']:.2f}ms "
+            f"({speedup:.2f}x vs PyTorch)"
+        )
 
 
 if __name__ == "__main__":
