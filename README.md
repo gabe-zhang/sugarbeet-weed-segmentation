@@ -60,8 +60,7 @@ sugarbeet-weed-segmentation/
 │   ├── train.py      # Training script
 │   ├── test.py       # Testing script
 │   ├── val.py        # Validation script
-│   ├── predict.py    # Prediction script
-│   └── inference.py  # Inference script
+│   └── predict.py    # Prediction script
 ├── config/           # YAML configurations
 ├── models/           # Pretrained checkpoints
 ├── modules/          # Model architectures (ERFNet, DeepLabV3+, UNet)
