@@ -1,10 +1,16 @@
-"""Benchmark script to compare inference speed between PyTorch and TensorRT models.
+"""Benchmark script to compare inference speed between PyTorch and TensorRT.
 
-Compares: erfnet.ckpt (PyTorch), erfnet_tensorrt.ts (FP32), erfnet_half_tensorrt.ts (FP16)
+Compares: erfnet.ckpt (PyTorch), erfnet_tensorrt.ts (FP32),
+erfnet_half_tensorrt.ts (FP16)
 """
+
 import argparse
 import os
+import sys
 import time
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Dict, List, Tuple
 
 import oyaml as yaml

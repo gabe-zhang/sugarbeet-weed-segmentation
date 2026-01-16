@@ -1,8 +1,12 @@
-""" Predict with semantic segmentation model.
-"""
+"""Predict with TensorRT semantic segmentation model."""
+
 import argparse
 import os
+import sys
 import time
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Dict
 
 import oyaml as yaml
