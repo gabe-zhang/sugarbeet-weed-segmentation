@@ -2,6 +2,8 @@
 __pycache__
 models/
 prediction/
+data/
+.vscode
 
 # Files
 **.pyc
