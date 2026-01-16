@@ -1,8 +1,0 @@
-[project]
-name = "sugarbeet-weed-segmentation"
-version = "0.1.0"
-description = "Semantic segmentation for weed detection in sugarbeet fields"
-readme = "README.md"
-requires-python = ">=3.8"
-dependencies = [
-]
