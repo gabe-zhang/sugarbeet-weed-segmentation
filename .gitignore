@@ -1,8 +1,8 @@
 # Folders
+__pycache__
 models/
 prediction/
-config/
-scripts/
 
 # Files
 **.pyc
+TODO.md
