@@ -1,9 +1,9 @@
 seed: 1682406612
 experiment:
-  id: ndsu_2025_07_10
+  id: predict
 data:
-  name: ndsu_2025_07_10
-  path_to_dataset: /home/zy/proj/weed-detect/data/ndsu_2025_07_10
+  name: predict
+  path_to_dataset: ./data/predict
   num_workers: 1
   image_normalizer:
     name: single_image_normalizer
