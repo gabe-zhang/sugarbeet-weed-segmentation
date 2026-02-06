@@ -4,7 +4,7 @@ experiment:
 data:
   name: phenobench
   path_to_dataset: ./data/PhenoBench
-  num_workers: 0
+  num_workers: 4
   image_normalizer:
     name: single_image_normalizer
 backbone:
@@ -54,7 +54,7 @@ val:
   step_settings:
     - regular
   n_gpus: 1
-  batch_size: 1
+  batch_size: 2
   check_val_every_n_epoch: 4096
   vis_val_every_x_epochs: 4096
   postprocess_val_every_x_epochs: 4096
@@ -66,7 +66,7 @@ test:
   step_settings:
     - regular
   n_gpus: 1
-  batch_size: 4
+  batch_size: 1
   geometric_data_augmentations:
     center_crop:
       height: 1024
