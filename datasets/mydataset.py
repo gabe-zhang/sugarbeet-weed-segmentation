@@ -1,7 +1,7 @@
 import os
 from typing import Callable, Dict, List, Optional
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms

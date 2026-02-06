@@ -1,10 +1,12 @@
-""" Full assembly of the parts to form the complete network """
+"""Full assembly of the parts to form the complete network"""
 
 from .unet_parts import *
 
 
 class UNet(nn.Module):
-    def __init__(self, n_classes: int, n_channels: int = 3, bilinear: bool=False):
+    def __init__(
+        self, n_classes: int, n_channels: int = 3, bilinear: bool = False
+    ):
         super(UNet, self).__init__()
         self.num_classes = n_classes
         self.num_channels = n_channels

@@ -3,13 +3,16 @@ name = "sugarbeet-weed-segmentation"
 version = "0.1.0"
 description = "Semantic segmentation for weed detection in sugarbeet fields"
 readme = "README.md"
-requires-python = ">=3.9.22"
+requires-python = ">=3.12.12"
 dependencies = [
-    "numpy==1.23.0",
+    "lightning==2.6.1",
+    "numpy>=2.4.2",
+    "opencv-python-headless>=4.13.0.92",
     "oyaml>=1.0",
-    "pytorch-lightning==1.6.2",
-    "scikit-image>=0.24.0",
-    "torchmetrics==0.10.3",
-    "torchvision>=0.23.0",
+    "scikit-image>=0.26.0",
+    "torch==2.6.0",
+    "torchmetrics>=1.8.2",
+    "torchvision==0.21.0",
+    "wandb>=0.24.2",
     "wget>=3.2",
 ]

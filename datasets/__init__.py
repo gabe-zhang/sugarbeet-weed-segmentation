@@ -1,14 +1,14 @@
 from typing import Dict
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
-from .pdc import PDCModule
 from .mydataset import MyDatasetModule
+from .pdc import PDCModule
 
 
 def get_data_module(cfg: Dict) -> pl.LightningDataModule:
-	dataset_name = cfg['data']['name']
-	if dataset_name == 'phenobench':
-		return PDCModule(cfg)
-	else:
-		return MyDatasetModule(cfg)
+    dataset_name = cfg["data"]["name"]
+    if dataset_name == "phenobench":
+        return PDCModule(cfg)
+    else:
+        return MyDatasetModule(cfg)
