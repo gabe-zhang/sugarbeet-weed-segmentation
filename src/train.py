@@ -2,18 +2,26 @@
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from typing import Dict
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 
-import git
+import lightning.pytorch as pl
 import oyaml as yaml
-import pytorch_lightning as pl
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
+from lightning.pytorch.loggers import WandbLogger
 
 from callbacks import (
     ConfigCallback,
@@ -27,10 +35,13 @@ from modules import get_backbone, get_criterion, module
 
 
 def get_git_commit_hash() -> str:
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.head.object.hexsha
-
-    return sha
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 def parse_args() -> Dict[str, str]:
@@ -38,10 +49,12 @@ def parse_args() -> Dict[str, str]:
     parser.add_argument(
         "--export_dir",
         required=True,
-        help="Path to export dir which saves logs, metrics, etc.",
+        help=("Path to export dir which saves logs, metrics, etc."),
     )
     parser.add_argument(
-        "--config", required=True, help="Path to configuration file (*.yaml)"
+        "--config",
+        required=True,
+        help="Path to configuration file (*.yaml)",
     )
     parser.add_argument(
         "--ckpt_path",
@@ -50,7 +63,9 @@ def parse_args() -> Dict[str, str]:
         help="Provide *.ckpt file to continue training.",
     )
     parser.add_argument(
-        "--resume", required=False, action="store_true"
+        "--resume",
+        required=False,
+        action="store_true",
     )  # implies default = False
 
     args = vars(parser.parse_args())
@@ -78,7 +93,7 @@ def main():
         cfg["seed"] = seed_val
     else:
         seed_val = cfg["seed"]
-    pl.utilities.seed.seed_everything(seed_val)
+    pl.seed_everything(seed_val)
 
     datasetmodule = get_data_module(cfg)
     criterion = get_criterion(cfg)
@@ -86,14 +101,14 @@ def main():
     # define backbone
     network = get_backbone(cfg)
 
-    if (args["ckpt_path"] is not None) and (not args["resume"]):
+    if args["ckpt_path"] is not None and not args["resume"]:
         seg_module = module.SegmentationNetwork(
             network,
             criterion,
             cfg["train"]["learning_rate"],
             cfg["train"]["weight_decay"],
-            train_step_settings=cfg["train"]["step_settings"],
-            val_step_settings=cfg["val"]["step_settings"],
+            train_step_settings=(cfg["train"]["step_settings"]),
+            val_step_settings=(cfg["val"]["step_settings"]),
             ckpt_path=args["ckpt_path"],
         )
     else:
@@ -102,33 +117,33 @@ def main():
             criterion,
             cfg["train"]["learning_rate"],
             cfg["train"]["weight_decay"],
-            train_step_settings=cfg["train"]["step_settings"],
-            val_step_settings=cfg["val"]["step_settings"],
+            train_step_settings=(cfg["train"]["step_settings"]),
+            val_step_settings=(cfg["val"]["step_settings"]),
         )
 
     # Add callbacks
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
     checkpoint_saver_val_loss = ModelCheckpoint(
         monitor="val_loss",
-        filename=cfg["experiment"]["id"] + "_{epoch:02d}_{val_loss:.4f}",
+        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{val_loss:.4f}"),
         mode="min",
         save_last=True,
     )
     checkpoint_saver_val_mIoU = ModelCheckpoint(
         monitor="val_mIoU",
-        filename=cfg["experiment"]["id"] + "_{epoch:02d}_{val_mIoU:.4f}",
+        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{val_mIoU:.4f}"),
         mode="max",
         save_last=False,
     )
     checkpoint_saver_train_loss = ModelCheckpoint(
         monitor="train_loss",
-        filename=cfg["experiment"]["id"] + "_{epoch:02d}_{train_loss:.4f}",
+        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{train_loss:.4f}"),
         mode="min",
         save_last=False,
     )
     checkpoint_saver_train_mIoU = ModelCheckpoint(
         monitor="train_mIoU",
-        filename=cfg["experiment"]["id"] + "_{epoch:02d}_{train_mIoU:.4f}",
+        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{train_mIoU:.4f}"),
         mode="max",
         save_last=False,
     )
@@ -150,17 +165,33 @@ def main():
         cfg["val"]["postprocess_val_every_x_epochs"],
     )
     config_callback = ConfigCallback(cfg)
+    early_stopping = EarlyStopping(
+        monitor="val_mIoU",
+        mode="max",
+        patience=10,
+    )
+
+    # Setup logger
+    wandb_logger = WandbLogger(
+        project="sugarbeet-weed-segmentation",
+        name=cfg["experiment"]["id"],
+        config=cfg,
+        save_dir=args["export_dir"],
+    )
 
     # Setup trainer
     trainer = Trainer(
         benchmark=cfg["train"]["benchmark"],
-        gpus=cfg["train"]["n_gpus"],
+        accelerator="gpu",
+        devices=cfg["train"]["n_gpus"],
         default_root_dir=args["export_dir"],
+        logger=wandb_logger,
         max_epochs=cfg["train"]["max_epoch"],
-        check_val_every_n_epoch=cfg["val"]["check_val_every_n_epoch"],
+        check_val_every_n_epoch=(cfg["val"]["check_val_every_n_epoch"]),
         callbacks=[
             *my_checkpoint_savers,
             lr_monitor,
+            early_stopping,
             visualizer_callback,
             postprocessor_callback,
             config_callback,
@@ -170,14 +201,20 @@ def main():
     if args["ckpt_path"] is None:
         print("Train from scratch.")
         trainer.fit(seg_module, datasetmodule)
-    elif (args["ckpt_path"] is not None) and (not args["resume"]):
+    elif args["ckpt_path"] is not None and not args["resume"]:
         print(
-            "Load pretrained model weights but other params (e.g. learning rate) start from scratch."
+            "Load pretrained model weights but "
+            "other params (e.g. learning rate) "
+            "start from scratch."
         )
         trainer.fit(seg_module, datasetmodule)
-    elif (args["ckpt_path"] is not None) and args["resume"]:
+    elif args["ckpt_path"] is not None and args["resume"]:
         print("Load pretrained model weights and resume training.")
-        trainer.fit(seg_module, datasetmodule, ckpt_path=args["ckpt_path"])
+        trainer.fit(
+            seg_module,
+            datasetmodule,
+            ckpt_path=args["ckpt_path"],
+        )
     else:
         raise RuntimeError(
             "Can't train any model since the settings are invalid."

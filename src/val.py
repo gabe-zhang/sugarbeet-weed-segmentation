@@ -9,7 +9,8 @@ from typing import Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import oyaml as yaml
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
+from lightning.pytorch.loggers import WandbLogger
 
 from callbacks import (
     ConfigCallback,
@@ -80,10 +81,20 @@ def main():
     )
     config_callback = ConfigCallback(cfg)
 
+    # Setup logger
+    wandb_logger = WandbLogger(
+        project="sugarbeet-weed-segmentation",
+        name=cfg["experiment"]["id"] + "-val",
+        config=cfg,
+        save_dir=args["export_dir"],
+    )
+
     # Setup trainer
     trainer = Trainer(
         default_root_dir=args["export_dir"],
-        gpus=cfg["val"]["n_gpus"],
+        accelerator="gpu",
+        devices=cfg["val"]["n_gpus"],
+        logger=wandb_logger,
         callbacks=[
             visualizer_callback,
             postprocessor_callback,

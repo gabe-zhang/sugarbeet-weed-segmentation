@@ -1,6 +1,7 @@
 """Predict with semantic segmentation model."""
 
 import argparse
+import glob
 import os
 import sys
 from typing import Dict
@@ -9,9 +10,10 @@ from typing import Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import oyaml as yaml
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 
 from callbacks import (
+    ConfigCallback,
     PostprocessorrCallback,
     VisualizerCallback,
     get_postprocessors,
@@ -78,14 +80,31 @@ def main():
         cfg["train"]["postprocess_train_every_x_epochs"],
     )
 
+    # Build versioned run directory: {export_dir}/{dataset_name}_{nn}
+    dataset_name = os.path.basename(cfg["data"]["path_to_dataset"])
+    existing = glob.glob(os.path.join(args["export_dir"], f"{dataset_name}_*"))
+    run_num = len(existing) + 1
+    run_dir = os.path.join(
+        args["export_dir"],
+        f"{dataset_name}_{run_num:02d}",
+    )
+
     # Setup trainer
     trainer = Trainer(
-        gpus=cfg["predict"]["n_gpus"],
-        default_root_dir=args["export_dir"],
-        callbacks=[visualizer_callback, postprocessor_callback],
+        accelerator="gpu",
+        devices=cfg["predict"]["n_gpus"],
+        default_root_dir=run_dir,
+        logger=False,
+        callbacks=[
+            ConfigCallback(cfg),
+            visualizer_callback,
+            postprocessor_callback,
+        ],
     )
     trainer.predict(
-        seg_module, dataloaders=datasetmodule, ckpt_path=args["ckpt_path"]
+        seg_module,
+        datamodule=datasetmodule,
+        ckpt_path=args["ckpt_path"],
     )
 
 
