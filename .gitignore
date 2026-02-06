@@ -1,10 +1,19 @@
-# Folders
-__pycache__
-models/
-prediction/
-data/
-.vscode
+# Python
+__pycache__/
+*.pyc
 
-# Files
-**.pyc
+# Data & models
+data/
+models/
+images/
+
+# Outputs
+runs/
+prediction/
+wandb/
+
+# IDE
+.vscode/
+
+# Notes
 TODO.md

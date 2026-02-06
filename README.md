@@ -46,10 +46,12 @@ uv pip install -r requirements.txt
 
 ### Dataset Configuration
 
-Update the dataset path in the configuration files:
+Update the dataset path in the configuration files under `config/`:
 ```bash
-./config/config_erfnet.yaml
-./config/config_deeplab.yaml
+config/config_erfnet.yaml
+config/config_deeplab.yaml
+config/erfnet_finetune_phenobench.yaml
+config/erfnet_predict.yaml
 ```
 
 ## Project Structure
@@ -67,7 +69,9 @@ sugarbeet-weed-segmentation/
 ├── datasets/         # Data loaders and augmentations
 ├── callbacks/        # Training callbacks
 ├── scripts/          # Shell scripts
-│   └── val.sh        # Validation runner
+│   ├── train.sh      # Training runner
+│   ├── val.sh        # Validation runner
+│   └── predict.sh    # Prediction runner
 └── tools/            # Python utility scripts
     ├── calculate_class_weights.py
     ├── calculate_means_stds.py
