@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import skimage.io
 import torch
-from pytorch_lightning.callbacks import Callback
+from lightning.pytorch.callbacks import Callback
 from torchvision import transforms
 
 
@@ -77,14 +77,18 @@ class WeedBboxVisualizer(BasicVisualizer):
                 pred = torch.argmax(logits_single_img, dim=0)
                 weed_mask = pred == 2
                 weed_mask = (
-                        weed_mask.long() * 255
-                    ).detach().cpu().numpy().astype(np.uint8)
+                    (weed_mask.long() * 255)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.uint8)
+                )
                 kernel = np.ones((20, 20), np.uint8)
                 weed_mask = cv2.morphologyEx(
-                    weed_mask, cv2.MORPH_CLOSE, kernel)
+                    weed_mask, cv2.MORPH_CLOSE, kernel
+                )
                 kernel = np.ones((10, 10), np.uint8)
-                weed_mask = cv2.morphologyEx(
-                    weed_mask, cv2.MORPH_OPEN, kernel)
+                weed_mask = cv2.morphologyEx(weed_mask, cv2.MORPH_OPEN, kernel)
 
                 blobs, _ = cv2.findContours(
                     weed_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
@@ -97,7 +101,9 @@ class WeedBboxVisualizer(BasicVisualizer):
                     # (x,y) be the top-left coordinate of the rectangle
                     # and (w,h) be its width and height.
                     x, y, w, h = cv2.boundingRect(blob)
-                    cv2.rectangle(image, (x,y), (x+w,y+h), (255,0,0), 2)
+                    cv2.rectangle(
+                        image, (x, y), (x + w, y + h), (255, 0, 0), 2
+                    )
 
                 fpath = os.path.join(path_to_dir, filename)
                 skimage.io.imsave(fpath, image, check_contrast=False)
@@ -298,7 +304,7 @@ def get_visualizers(cfg: Dict) -> List[BasicVisualizer]:
 
     try:
         cfg["visualizers"].keys()
-    except KeyError:
+    except (KeyError, AttributeError):
         return visualizers
 
     for visualizer_name in cfg["visualizers"].keys():
@@ -334,7 +340,9 @@ def get_visualizers(cfg: Dict) -> List[BasicVisualizer]:
 
             visualizers.append(visualizer)
 
-        elif visualizer_name == "semantic_overlay_correct_incorrect_visualizer":
+        elif (
+            visualizer_name == "semantic_overlay_correct_incorrect_visualizer"
+        ):
             classes_to_colors = cfg["visualizers"][visualizer_name][
                 "classes_to_colors"
             ]
@@ -376,13 +384,12 @@ class VisualizerCallback(Callback):
         outputs: Dict[str, Any],
         batch,
         batch_idx,
-        dataloader_idx,
     ):
         # visualize
         epoch = trainer.current_epoch
         if (epoch % self.vis_train_every_x_epochs) == 0 and (epoch != 0):
             path = os.path.join(
-                trainer.log_dir, "train", "visualize", f"epoch-{epoch:06d}"
+                trainer.log_dir, "train", f"epoch-{epoch:06d}"
             )
 
             for visualizer in self.visualizers:
@@ -395,14 +402,13 @@ class VisualizerCallback(Callback):
         outputs: Dict[str, Any],
         batch,
         batch_idx,
-        dataloader_idx,
     ):
         # visualize
         epoch = trainer.current_epoch
 
         if ((epoch + 1) % self.vis_val_every_x_epochs) == 0 and (epoch != 0):
             path = os.path.join(
-                trainer.log_dir, "val", "visualize", f"epoch-{epoch:06d}"
+                trainer.log_dir, "val", f"epoch-{epoch:06d}"
             )
 
             for visualizer in self.visualizers:
@@ -415,10 +421,9 @@ class VisualizerCallback(Callback):
         outputs: Dict[str, Any],
         batch,
         batch_idx,
-        dataloader_idx,
     ):
         # visualize
-        path = os.path.join(trainer.log_dir, "visualize")
+        path = trainer.log_dir
 
         for visualizer in self.visualizers:
             visualizer.save_visualize_batch(path, outputs, batch)
@@ -430,10 +435,9 @@ class VisualizerCallback(Callback):
         outputs: Dict[str, Any],
         batch,
         batch_idx,
-        dataloader_idx,
     ):
         # visualize
-        path = os.path.join(trainer.log_dir, "visualize")
+        path = trainer.log_dir
 
         for visualizer in self.visualizers:
             visualizer.save_visualize_batch(path, outputs, batch)

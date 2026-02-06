@@ -2,21 +2,20 @@ import os
 from typing import Dict
 
 import oyaml as yaml
-from pytorch_lightning.callbacks import Callback
+from lightning.pytorch.callbacks import Callback
 
 
 class ConfigCallback(Callback):
-  """ Callback to save the config file of a model.
-  """
+    """Callback to save the config file of a model."""
 
-  def __init__(self, cfg: Dict):
-    self.cfg = cfg
+    def __init__(self, cfg: Dict):
+        self.cfg = cfg
 
-  def setup(self, trainer, pl_module, stage=None) -> None:
-    export_dir = os.path.join(trainer.log_dir, 'configuration')
-    if not os.path.exists(export_dir):
-      os.makedirs(export_dir)
+    def setup(self, trainer, pl_module, stage=None) -> None:
+        log_dir = trainer.log_dir
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
-    fpath = os.path.join(export_dir, 'config.yaml')
-    with open(fpath, 'w') as ostream:
-      yaml.dump(self.cfg, ostream)
+        fpath = os.path.join(log_dir, "config.yaml")
+        with open(fpath, "w") as ostream:
+            yaml.dump(self.cfg, ostream)
