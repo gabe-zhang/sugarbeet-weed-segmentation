@@ -1,17 +1,18 @@
 ## Python & Tool Use
 - Use `ruff` to check coding style
 - Do not add Claude co-author in commit messages
+- On brain device: use `uv run` and `uv pip install`
+- Otherwise: use `uv` to run and manage packages
 
-If on the brain device:
-- Use `uv` to run and `uv pip install` to install packages
-
-If not on the brain device:
-- Use `uv` to run and manage packages
-
-## Code style
+## Code Style
 - Use PEP8 style guide for Python coding.
 - Limit all lines to a maximum of 79 characters.
+- Do not create summary markdown files unless explicitly told.
 
-## This codebase
-- Do NOT create any summary markdown files unless explicitly told.
-- Do not co-author in commit message.
+## Git
+- Use conventional commits (e.g. `feat:`, `fix:`, `chore:`)
+- Stage and commit related changes together
+
+## Response Generation
+- Minimize the usage of emojis.
+- Keep the summary at the end concise and essential.
