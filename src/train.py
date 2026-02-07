@@ -1,11 +1,14 @@
 """Train semantic segmentation model."""
 
 import argparse
+import glob
 import os
 import subprocess
 import sys
 import time
-from typing import Dict
+import urllib.request
+from pathlib import Path
+from typing import Dict, Optional
 
 # Add parent directory to path for imports
 sys.path.insert(
@@ -82,6 +85,44 @@ def load_config(path_to_config_file: str) -> Dict:
     return config
 
 
+PRETRAINED_URLS = {
+    "semantic-seg-erfnet.ckpt": (
+        "https://www.ipb.uni-bonn.de/html/projects/phenobench/"
+        "semantic_segmentation/semantic-seg-erfnet.ckpt"
+    ),
+    "semantic-seg-deeplab.ckpt": (
+        "https://www.ipb.uni-bonn.de/html/projects/phenobench/"
+        "semantic_segmentation/semantic-seg-deeplab.ckpt"
+    ),
+}
+
+
+def ensure_checkpoint(ckpt_path: str) -> None:
+    """Download pretrained checkpoint if it doesn't exist."""
+    if ckpt_path is None or os.path.exists(ckpt_path):
+        return
+
+    filename = Path(ckpt_path).name
+    url = PRETRAINED_URLS.get(filename)
+    if url is None:
+        return  # not a known pretrained file, let it fail later
+
+    print(f"Downloading pretrained weights: {filename}")
+    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+    urllib.request.urlretrieve(url, ckpt_path)
+    print(f"Saved to {ckpt_path}")
+
+
+def find_last_checkpoint(export_dir: str) -> Optional[str]:
+    """Find the most recent last.ckpt in export directory."""
+    pattern = os.path.join(export_dir, "**", "last.ckpt")
+    matches = glob.glob(pattern, recursive=True)
+    if not matches:
+        return None
+    latest = max(matches, key=os.path.getmtime)
+    return latest
+
+
 def main():
     args = parse_args()
 
@@ -94,6 +135,21 @@ def main():
     else:
         seed_val = cfg["seed"]
     pl.seed_everything(seed_val)
+
+    # Auto-detect last checkpoint when --resume without --ckpt_path
+    if args["resume"] and args["ckpt_path"] is None:
+        last_ckpt = find_last_checkpoint(args["export_dir"])
+        if last_ckpt is not None:
+            args["ckpt_path"] = last_ckpt
+            print(f"Auto-detected checkpoint: {last_ckpt}")
+        else:
+            print(
+                "Warning: --resume specified but no "
+                "last.ckpt found. Training from scratch."
+            )
+            args["resume"] = False
+
+    ensure_checkpoint(args["ckpt_path"])
 
     datasetmodule = get_data_module(cfg)
     criterion = get_criterion(cfg)
