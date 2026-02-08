@@ -123,6 +123,22 @@ def find_last_checkpoint(export_dir: str) -> Optional[str]:
     return latest
 
 
+def find_wandb_run_id(export_dir: str) -> Optional[str]:
+    """Find the most recent WandB run ID from export dir."""
+    wandb_dir = os.path.join(export_dir, "wandb")
+    if not os.path.isdir(wandb_dir):
+        return None
+    run_dirs = glob.glob(
+        os.path.join(wandb_dir, "run-*")
+    )
+    if not run_dirs:
+        return None
+    latest = max(run_dirs, key=os.path.getmtime)
+    # run dir format: run-YYYYMMDD_HHMMSS-<run_id>
+    run_id = os.path.basename(latest).split("-")[-1]
+    return run_id
+
+
 def main():
     args = parse_args()
 
@@ -157,6 +173,9 @@ def main():
     # define backbone
     network = get_backbone(cfg)
 
+    # Get optimizer kwargs from config (optional)
+    optimizer_kwargs = cfg["train"].get("optimizer_kwargs", None)
+
     if args["ckpt_path"] is not None and not args["resume"]:
         seg_module = module.SegmentationNetwork(
             network,
@@ -166,6 +185,7 @@ def main():
             train_step_settings=(cfg["train"]["step_settings"]),
             val_step_settings=(cfg["val"]["step_settings"]),
             ckpt_path=args["ckpt_path"],
+            optimizer_kwargs=optimizer_kwargs,
         )
     else:
         seg_module = module.SegmentationNetwork(
@@ -175,40 +195,26 @@ def main():
             cfg["train"]["weight_decay"],
             train_step_settings=(cfg["train"]["step_settings"]),
             val_step_settings=(cfg["val"]["step_settings"]),
+            optimizer_kwargs=optimizer_kwargs,
         )
+
+    # Setup run directory: runs/<experiment_id>/
+    run_dir = os.path.join(
+        args["export_dir"], cfg["experiment"]["id"]
+    )
+    ckpt_dir = os.path.join(run_dir, "checkpoints")
 
     # Add callbacks
     lr_monitor = LearningRateMonitor(logging_interval="epoch")
-    checkpoint_saver_val_loss = ModelCheckpoint(
-        monitor="val_loss",
-        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{val_loss:.4f}"),
-        mode="min",
-        save_last=True,
-    )
-    checkpoint_saver_val_mIoU = ModelCheckpoint(
+    checkpoint_best_val_mIoU = ModelCheckpoint(
+        dirpath=ckpt_dir,
         monitor="val_mIoU",
-        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{val_mIoU:.4f}"),
+        filename="epoch={epoch:02d}_val_mIoU={val_mIoU:.4f}",
+        auto_insert_metric_name=False,
         mode="max",
+        save_top_k=1,
         save_last=False,
     )
-    checkpoint_saver_train_loss = ModelCheckpoint(
-        monitor="train_loss",
-        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{train_loss:.4f}"),
-        mode="min",
-        save_last=False,
-    )
-    checkpoint_saver_train_mIoU = ModelCheckpoint(
-        monitor="train_mIoU",
-        filename=(cfg["experiment"]["id"] + "_{epoch:02d}_{train_mIoU:.4f}"),
-        mode="max",
-        save_last=False,
-    )
-
-    my_checkpoint_savers = [
-        var_value
-        for var_name, var_value in locals().items()
-        if var_name.startswith("checkpoint_saver")
-    ]
 
     visualizer_callback = VisualizerCallback(
         get_visualizers(cfg),
@@ -221,18 +227,32 @@ def main():
         cfg["val"]["postprocess_val_every_x_epochs"],
     )
     config_callback = ConfigCallback(cfg)
+
+    # Early stopping configuration (with defaults)
+    early_stopping_cfg = cfg["train"].get("early_stopping", {})
     early_stopping = EarlyStopping(
-        monitor="val_mIoU",
-        mode="max",
-        patience=10,
+        monitor=early_stopping_cfg.get("monitor", "val_mIoU"),
+        mode=early_stopping_cfg.get("mode", "max"),
+        patience=early_stopping_cfg.get("patience", 10),
+        min_delta=early_stopping_cfg.get("min_delta", 0.0),
     )
 
     # Setup logger
+    wandb_kwargs = {}
+    if args["resume"]:
+        run_id = find_wandb_run_id(run_dir)
+        if run_id is not None:
+            wandb_kwargs["id"] = run_id
+            wandb_kwargs["resume"] = "must"
+            print(f"Resuming WandB run: {run_id}")
+
     wandb_logger = WandbLogger(
         project="sugarbeet-weed-segmentation",
         name=cfg["experiment"]["id"],
+        version="",
         config=cfg,
         save_dir=args["export_dir"],
+        **wandb_kwargs,
     )
 
     # Setup trainer
@@ -240,12 +260,12 @@ def main():
         benchmark=cfg["train"]["benchmark"],
         accelerator="gpu",
         devices=cfg["train"]["n_gpus"],
-        default_root_dir=args["export_dir"],
+        default_root_dir=run_dir,
         logger=wandb_logger,
         max_epochs=cfg["train"]["max_epoch"],
         check_val_every_n_epoch=(cfg["val"]["check_val_every_n_epoch"]),
         callbacks=[
-            *my_checkpoint_savers,
+            checkpoint_best_val_mIoU,
             lr_monitor,
             early_stopping,
             visualizer_callback,
@@ -275,6 +295,26 @@ def main():
         raise RuntimeError(
             "Can't train any model since the settings are invalid."
         )
+
+    # Log training completion status
+    best_score = checkpoint_best_val_mIoU.best_model_score
+    best_path = checkpoint_best_val_mIoU.best_model_path
+    best_epoch = int(
+        os.path.basename(best_path).split("epoch=")[1].split("_")[0]
+    ) if best_path else -1
+    if early_stopping.stopped_epoch > 0:
+        print(
+            f"\nTraining stopped early by EarlyStopping "
+            f"callback at epoch {early_stopping.stopped_epoch}"
+        )
+    else:
+        print(
+            f"\nTraining completed successfully for "
+            f"{trainer.current_epoch + 1} epochs"
+        )
+    print(
+        f"Best val_mIoU: {best_score:.4f} at epoch {best_epoch}"
+    )
 
 
 if __name__ == "__main__":

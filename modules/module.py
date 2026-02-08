@@ -21,6 +21,7 @@ class SegmentationNetwork(pl.LightningModule):
         test_step_settings: Optional[List[str]] = None,
         predict_step_settings: Optional[List[str]] = None,
         ckpt_path=None,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
 
@@ -28,8 +29,11 @@ class SegmentationNetwork(pl.LightningModule):
         self.criterion = criterion
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.optimizer_kwargs = optimizer_kwargs or {}
 
-        self.save_hyperparameters("learning_rate", "weight_decay")
+        self.save_hyperparameters(
+            "learning_rate", "weight_decay", "optimizer_kwargs"
+        )
 
         # evaluation metrics for all classes
         self.metric_train_iou = torchmetrics.JaccardIndex(
@@ -259,8 +263,6 @@ class SegmentationNetwork(pl.LightningModule):
         path_to_classwise_iou_dir = os.path.join(
             self.trainer.log_dir,
             "val",
-            "evaluation",
-            "iou-classwise",
             f"epoch-{epoch:06d}",
         )
         save_iou_metric(iou_per_class, path_to_classwise_iou_dir)
@@ -297,8 +299,7 @@ class SegmentationNetwork(pl.LightningModule):
 
         path_to_classwise_iou_dir = os.path.join(
             self.trainer.log_dir,
-            "evaluation",
-            "iou-classwise",
+            "test",
             f"epoch-{epoch:06d}",
         )
         save_iou_metric(iou_per_class, path_to_classwise_iou_dir)
@@ -317,11 +318,19 @@ class SegmentationNetwork(pl.LightningModule):
         return {"logits": logits}
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(
-            self.parameters(),
-            lr=self.learning_rate,
-            weight_decay=self.weight_decay,
-        )
+        # Merge default Adam kwargs with user-provided ones
+        adam_defaults = {
+            "lr": self.learning_rate,
+            "weight_decay": self.weight_decay,
+            "eps": 1e-8,  # PyTorch default
+            "betas": (0.9, 0.999),  # PyTorch default
+        }
+        adam_kwargs = {**adam_defaults, **self.optimizer_kwargs}
+        # Ensure lr and weight_decay from config take precedence
+        adam_kwargs["lr"] = self.learning_rate
+        adam_kwargs["weight_decay"] = self.weight_decay
+
+        optimizer = optim.Adam(self.parameters(), **adam_kwargs)
 
         max_epochs = self.trainer.max_epochs
 

@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 import lightning.pytorch as pl
 import numpy as np
@@ -12,7 +12,9 @@ from torchvision import transforms
 import datasets.common as common
 from datasets.augmentations_color import get_color_augmentations
 from datasets.augmentations_geometry import (
+    CopyPasteWeed,
     GeometricDataAugmentation,
+    get_copy_paste_augmentation,
     get_geometric_augmentations,
 )
 from datasets.image_normalizer import ImageNormalizer, get_image_normalizer
@@ -53,6 +55,7 @@ class PDC(Dataset):
         img_normalizer: ImageNormalizer,
         augmentations_geometric: List[GeometricDataAugmentation],
         augmentations_color: List[Callable],
+        copy_paste: Optional[CopyPasteWeed] = None,
     ):
         """Get the path to all images and its corresponding annotations.
 
@@ -76,6 +79,7 @@ class PDC(Dataset):
         self.img_normalizer = img_normalizer
         self.augmentations_geometric = augmentations_geometric
         self.augmentations_color = augmentations_color
+        self.copy_paste = copy_paste
 
         # ------------- Prepare Training -------------
         self.path_to_train_images = os.path.join(
@@ -144,6 +148,17 @@ class PDC(Dataset):
         mask_4 = anno == 4
         anno[mask_4] = 2
 
+        if self.copy_paste is not None:
+            donor_idx = random.randint(
+                0, len(self.filenames_train) - 1
+            )
+            d_img, d_anno = self._load_augmented(
+                donor_idx
+            )
+            img, anno = self.copy_paste(
+                img, anno, d_img, d_anno
+            )
+
         img_before_norm = img.clone()
         img = self.img_normalizer.normalize(img)
 
@@ -153,6 +168,49 @@ class PDC(Dataset):
             "anno": anno,
             "fname": self.filenames_train[idx],
         }
+
+    def _load_augmented(
+        self, idx: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Load a training sample with augmentations applied.
+
+        Used to obtain a donor image for copy-paste.
+
+        Args:
+            idx: index into filenames_train
+
+        Returns:
+            Tuple of (image [C x H x W], anno [H x W])
+        """
+        path_img = os.path.join(
+            self.path_to_train_images,
+            self.filenames_train[idx],
+        )
+        img = self.img_to_tensor(Image.open(path_img))
+
+        if random.random() > 0.25:
+            for aug in self.augmentations_color:
+                img = aug(img)
+
+        path_anno = os.path.join(
+            self.path_to_train_annos,
+            self.filenames_train[idx],
+        )
+        anno = np.array(Image.open(path_anno))
+        if len(anno.shape) > 2:
+            anno = anno[:, :, 0]
+        anno = torch.tensor(
+            anno.astype(np.int64), dtype=torch.int64
+        ).unsqueeze(0)
+
+        for aug in self.augmentations_geometric:
+            img, anno = aug(img, anno)
+        anno = anno.squeeze(0)
+
+        anno[anno == 3] = 1
+        anno[anno == 4] = 2
+
+        return img, anno
 
     def get_val_item(self, idx: int) -> Dict:
         path_to_current_img = os.path.join(
@@ -269,12 +327,16 @@ class PDCModule(pl.LightningDataModule):
             train_augmentations_color = get_color_augmentations(
                 self.cfg, "train"
             )
+            train_copy_paste = get_copy_paste_augmentation(
+                self.cfg, "train"
+            )
             self.train_ds = PDC(
                 path_to_dataset,
                 mode="train",
                 img_normalizer=image_normalizer,
                 augmentations_geometric=train_augmentations_geometric,
                 augmentations_color=train_augmentations_color,
+                copy_paste=train_copy_paste,
             )
 
             # ----------- VAL -----------

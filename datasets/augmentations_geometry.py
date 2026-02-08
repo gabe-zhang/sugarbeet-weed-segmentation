@@ -8,6 +8,7 @@ import random
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as functional
@@ -47,9 +48,18 @@ class ResizeTransform(GeometricDataAugmentation):
 
 
 class RandomTranslationTransform(GeometricDataAugmentation):
-    """Randomly translate an image and its annoation."""
+    """Randomly translate an image and its annotation.
 
-    def __init__(self, min_translation: int = 0, max_translation: int = 0):
+    Translation values in (-1, 1) are treated as fractions of
+    the image dimensions.  Values outside that range are treated
+    as absolute pixel offsets.
+    """
+
+    def __init__(
+        self,
+        min_translation: float = 0,
+        max_translation: float = 0,
+    ):
         self.min_translation = min_translation
         self.max_translation = max_translation
         assert max_translation >= min_translation
@@ -57,7 +67,6 @@ class RandomTranslationTransform(GeometricDataAugmentation):
     def __call__(
         self, image: torch.Tensor, anno: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        # dimension of each input should be identical
         assert image.shape[1] == anno.shape[1], (
             "Dimensions of all input should be identical."
         )
@@ -65,8 +74,25 @@ class RandomTranslationTransform(GeometricDataAugmentation):
             "Dimensions of all input should be identical."
         )
 
-        tx = random.randint(self.min_translation, self.max_translation + 1)
-        ty = random.randint(self.min_translation, self.max_translation + 1)
+        h, w = image.shape[1], image.shape[2]
+        if -1 < self.min_translation < 1:
+            tx = int(random.uniform(
+                self.min_translation * w,
+                self.max_translation * w,
+            ))
+            ty = int(random.uniform(
+                self.min_translation * h,
+                self.max_translation * h,
+            ))
+        else:
+            tx = random.randint(
+                int(self.min_translation),
+                int(self.max_translation),
+            )
+            ty = random.randint(
+                int(self.min_translation),
+                int(self.max_translation),
+            )
 
         image_translated = functional.affine(
             image,
@@ -92,11 +118,11 @@ class RandomRotationTransform(GeometricDataAugmentation):
     """Randomly rotate an image and its annotation by a random angle."""
 
     def __init__(
-        self, min_angle_in_deg: float = 0, max_angle_in_deg: float = 360
+        self,
+        min_angle_in_deg: float = -180,
+        max_angle_in_deg: float = 180,
     ):
-        assert min_angle_in_deg >= 0
-        assert max_angle_in_deg <= 360
-        assert min_angle_in_deg > max_angle_in_deg
+        assert min_angle_in_deg < max_angle_in_deg
 
         self.min_angle_in_deg = min_angle_in_deg
         self.max_angle_in_deg = max_angle_in_deg
@@ -737,3 +763,93 @@ def get_geometric_augmentations(
         cfg[stage]["geometric_data_augmentations"].keys()
     )
     return geometric_augmentations
+
+
+# -------------------- COPY-PASTE AUGMENTATION --------------------
+
+
+class CopyPasteWeed:
+    """Paste weed instances from a donor image onto target
+    image to address class imbalance."""
+
+    def __init__(
+        self,
+        weed_class: int = 2,
+        prob: float = 0.5,
+        max_instances: int = 3,
+    ):
+        """Initialize copy-paste augmentation.
+
+        Args:
+            weed_class: class index for weeds. Default: 2.
+            prob: probability of applying the augmentation.
+            max_instances: max weed instances to paste.
+        """
+        assert 0.0 <= prob <= 1.0
+        assert max_instances >= 1
+        self.weed_class = weed_class
+        self.prob = prob
+        self.max_instances = max_instances
+
+    def __call__(
+        self,
+        image: torch.Tensor,
+        anno: torch.Tensor,
+        donor_image: torch.Tensor,
+        donor_anno: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Paste weed instances from donor onto target.
+
+        Args:
+            image: target image [C x H x W]
+            anno: target annotation [H x W]
+            donor_image: donor image [C x H x W]
+            donor_anno: donor annotation [H x W]
+
+        Returns:
+            Tuple of augmented image and annotation.
+        """
+        if random.random() > self.prob:
+            return image, anno
+
+        weed_mask = donor_anno == self.weed_class
+        if not weed_mask.any():
+            return image, anno
+
+        weed_np = weed_mask.cpu().numpy().astype(np.uint8)
+        from scipy import ndimage
+
+        labeled, n_instances = ndimage.label(weed_np)
+        if n_instances == 0:
+            return image, anno
+
+        indices = list(range(1, n_instances + 1))
+        random.shuffle(indices)
+        selected = indices[: self.max_instances]
+
+        image = image.clone()
+        anno = anno.clone()
+        for inst_id in selected:
+            mask = torch.from_numpy(
+                labeled == inst_id
+            ).to(image.device)
+            image[:, mask] = donor_image[:, mask]
+            anno[mask] = self.weed_class
+
+        return image, anno
+
+
+def get_copy_paste_augmentation(
+    cfg, stage: str
+) -> Optional["CopyPasteWeed"]:
+    """Return CopyPasteWeed if configured, else None."""
+    if stage != "train":
+        return None
+    aug_cfg = cfg.get(stage, {}).get("copy_paste_weed")
+    if aug_cfg is None:
+        return None
+    return CopyPasteWeed(
+        weed_class=aug_cfg.get("weed_class", 2),
+        prob=aug_cfg.get("prob", 0.5),
+        max_instances=aug_cfg.get("max_instances", 3),
+    )

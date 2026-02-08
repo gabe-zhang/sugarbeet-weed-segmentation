@@ -369,10 +369,227 @@ def to_one_hot(tensor: torch.Tensor, n_classes: int) -> torch.Tensor:
     return one_hot
 
 
+# -------------------- DICE LOSS --------------------
+
+
+class DiceLoss(nn.Module):
+    def __init__(
+        self,
+        weights: Optional[List] = None,
+        eps: float = 1e-6,
+    ):
+        super().__init__()
+        if weights is not None:
+            self.weights = torch.Tensor(weights)
+        else:
+            self.weights = None
+        self.eps = eps
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        target: torch.Tensor,
+        mode: str,
+        mask_keep: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Compute Dice loss.
+
+        Args:
+            inputs: logits [B x C x H x W]
+            target: ground-truth [B x H x W]
+            mode: train, val, or test
+            mask_keep: pixel mask [B x H x W]
+                (1=keep, 0=ignore). Defaults to None.
+
+        Returns:
+            torch.Tensor: 1 - weighted mean Dice
+        """
+        assert mode in ["train", "val", "test"]
+
+        target = target.clone()
+        if mask_keep is not None:
+            target[~mask_keep] = 0
+
+        batch_size, num_classes, h, w = inputs.shape
+        device = inputs.device
+
+        probs = functional.softmax(inputs, dim=1)
+
+        target_oh = to_one_hot(
+            target, num_classes
+        ).float()
+
+        if mask_keep is None:
+            mask = torch.ones(
+                (batch_size, 1, h, w),
+                dtype=torch.float32,
+                device=device,
+            )
+        else:
+            mask = mask_keep.unsqueeze(1).float()
+
+        target_oh = target_oh * mask
+        probs = probs * mask
+
+        # per-class Dice: 2*|P*G| / (|P|+|G|+eps)
+        intersection = torch.sum(
+            probs * target_oh, dim=(0, 2, 3)
+        )
+        cardinality = torch.sum(
+            probs + target_oh, dim=(0, 2, 3)
+        )
+        dice = (
+            (2.0 * intersection + self.eps)
+            / (cardinality + self.eps)
+        )
+
+        if self.weights is not None:
+            if device != self.weights.device:
+                self.weights = self.weights.to(device)
+            w = self.weights / self.weights.sum()
+            loss = 1.0 - (dice * w).sum()
+        else:
+            loss = 1.0 - dice.mean()
+
+        return loss
+
+
+# -------------------- DICE + CE LOSS --------------------
+
+
+class DiceCELoss(nn.Module):
+    def __init__(
+        self,
+        weights: Optional[List] = None,
+        dice_weight: float = 0.5,
+        ce_weight: float = 0.5,
+    ):
+        super().__init__()
+        self.ce = CrossEntropy(weights)
+        self.dice = DiceLoss(weights)
+        self.dice_weight = dice_weight
+        self.ce_weight = ce_weight
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        target: torch.Tensor,
+        mode: str,
+        mask_keep: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Combined Dice + CrossEntropy loss."""
+        ce_loss = self.ce(inputs, target, mode, mask_keep)
+        dice_loss = self.dice(
+            inputs, target, mode, mask_keep
+        )
+        return (
+            self.ce_weight * ce_loss
+            + self.dice_weight * dice_loss
+        )
+
+
+# -------------------- FOCAL LOSS --------------------
+
+
+class FocalLoss(nn.Module):
+    def __init__(
+        self,
+        weights: Optional[List] = None,
+        gamma: float = 2.0,
+    ):
+        super().__init__()
+        if weights is not None:
+            self.weights = torch.Tensor(weights)
+        else:
+            self.weights = None
+        self.gamma = gamma
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        target: torch.Tensor,
+        mode: str,
+        mask_keep: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Compute focal loss.
+
+        Args:
+            inputs: logits [B x C x H x W]
+            target: ground-truth [B x H x W]
+            mode: train, val, or test
+            mask_keep: pixel mask [B x H x W]
+                (1=keep, 0=ignore). Defaults to None.
+
+        Returns:
+            torch.Tensor: mean focal loss
+        """
+        assert mode in ["train", "val", "test"]
+
+        if mask_keep is not None:
+            target = target.clone()
+            target[~mask_keep] = 0
+
+        batch_size, num_classes, height, width = inputs.shape
+        input_device = inputs.device
+
+        probs = functional.softmax(inputs, dim=1)
+        del inputs
+
+        target_one_hot = to_one_hot(target, int(num_classes))
+        target_one_hot = target_one_hot.bool()
+        del target
+
+        if mask_keep is None:
+            mask_keep = torch.ones(
+                (batch_size, 1, height, width),
+                dtype=torch.bool,
+                device=input_device,
+            )
+        else:
+            mask_keep = mask_keep.unsqueeze(1)
+
+        target_one_hot = target_one_hot * mask_keep
+
+        probs_gathered = probs[target_one_hot]
+        probs_gathered = torch.clip(probs_gathered, 1e-12, 1.0)
+
+        focal_weight = (1.0 - probs_gathered) ** self.gamma
+        losses = -focal_weight * torch.log(probs_gathered)
+        del probs_gathered
+
+        assert losses.shape[0] == torch.sum(mask_keep)
+        del mask_keep
+
+        if self.weights is not None:
+            if input_device != self.weights.device:
+                self.weights = self.weights.to(input_device)
+            weight_matrix = (
+                target_one_hot.permute(0, 2, 3, 1) * self.weights
+            ).permute(0, 3, 1, 2)
+            weights_gathered = weight_matrix[target_one_hot]
+            assert torch.all(weights_gathered > 0)
+            losses *= weights_gathered
+
+        return torch.mean(losses)
+
+
+# -------------------- CRITERION FACTORY --------------------
+
+
 def get_criterion(cfg) -> nn.Module:
     loss_name = cfg["train"]["loss"]
 
     if loss_name == "xentropy":
         weights = cfg["train"]["class_weights"]
-
         return CrossEntropy(weights)
+
+    if loss_name == "dice_ce":
+        weights = cfg["train"]["class_weights"]
+        return DiceCELoss(weights)
+
+    if loss_name == "focal":
+        weights = cfg["train"].get("class_weights")
+        gamma = cfg["train"].get("focal_gamma", 2.0)
+        return FocalLoss(weights, gamma)
+
+    raise ValueError(f"Unsupported loss: {loss_name}")
