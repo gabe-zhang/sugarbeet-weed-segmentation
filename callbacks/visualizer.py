@@ -233,14 +233,21 @@ class SemanticsOverlayCorrectIncorrectVisualizer(BasicVisualizer):
                     canvas[:, mask_correct_pred] = color_correct_tensor
 
                     # visualize incorrect predictions
-                    h, s, v = colorsys.rgb_to_hsv(
-                        class_color[0], class_color[1], class_color[2]
-                    )
-                    if v == 0:
-                        v = 127
-                    r, g, b = colorsys.hsv_to_rgb(h, s * 0.6, v)
+                    # 0 Soil (Black) -> Error = Blue (Missed object - False Negatives)
+                    # 1 Crop (Green) -> Error = Cyan (False Crop - False Positive)
+                    # 2 Weed (Red)   -> Error = Magenta (False Weed - False Positive)
+
+                    if class_id == 0:
+                        err_rgb = [0, 80, 255]  # Bright Blue
+                    elif class_id == 1:
+                        err_rgb = [0, 255, 255]  # Cyan
+                    elif class_id == 2:
+                        err_rgb = [255, 0, 255]  # Magenta
+                    else:
+                        err_rgb = [255, 255, 255]  # White
+
                     color_incorrect_tensor = (
-                        torch.Tensor([r, g, b]).unsqueeze(1).to(canvas.device)
+                        torch.Tensor(err_rgb).unsqueeze(1).to(canvas.device)
                     )
                     canvas[:, mask_false_pred] = color_incorrect_tensor
 
