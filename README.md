@@ -2,19 +2,19 @@
 
 A semantic segmentation framework for agricultural weed detection in **sugarbeet** fields, classifying pixels into three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
 
-> **Note**: This model is trained specifically on sugarbeet imagery from the PhenoBench dataset and is not designed for other crop types.
+> **Note**: Models are trained specifically on sugarbeet imagery from the PhenoBench dataset and are not designed for other crop types.
 
 ## Branches
 
 | Branch | Target Platform | Python | Description |
 |--------|-----------------|--------|-------------|
-| `main` | Desktop / Cloud GPU | 3.9+ | Full training and inference with `uv` managed dependencies |
+| `main` | Desktop / Cloud GPU | 3.12+ | Full training and inference with `uv` managed dependencies |
 | `brain` | NVIDIA Jetson Xavier NX | 3.8 | Edge deployment with TensorRT optimization |
 
 ### Main Branch
 - Full dependency management via `uv add`
 - Training, validation, and inference scripts
-- Supports ERFNet, DeepLabV3+, and UNet architectures
+- Supports [ERFNet](https://github.com/Eromera/erfnet_pytorch) and [DeepLabV3+](https://github.com/VainF/DeepLabV3Plus-Pytorch)
 
 ### Brain Branch
 - Dependencies managed via `uv pip install` with `--system-site-packages`
@@ -27,11 +27,8 @@ A semantic segmentation framework for agricultural weed detection in **sugarbeet
 ### Main Branch (Desktop/Cloud)
 
 ```bash
-# Clone and enter directory
 git clone https://github.com/gabe-zhang/sugarbeet-weed-segmentation.git
 cd sugarbeet-weed-segmentation
-
-# Install dependencies with uv
 uv sync
 ```
 
@@ -39,80 +36,51 @@ uv sync
 
 ```bash
 # Ensure system packages are available (CUDA, TensorRT, PyTorch)
-# Then install Python dependencies
 uv venv --system-site-packages
 uv pip install -r requirements.txt
 ```
 
 ### Dataset Configuration
 
-Update the dataset path in the configuration files under `config/`:
-```bash
-config/config_erfnet.yaml
-config/config_deeplab.yaml
-config/erfnet_finetune_phenobench.yaml
-config/erfnet_predict.yaml
-```
+Update `data.path_to_dataset` in the YAML config files under `config/`.
 
 ## Project Structure
 
 ```
 sugarbeet-weed-segmentation/
-├── src/              # Entry point scripts
-│   ├── train.py      # Training script
-│   ├── test.py       # Testing script
-│   ├── val.py        # Validation script
-│   └── predict.py    # Prediction script
-├── config/           # YAML configurations
+├── src/              # Entry points (train, test, val, predict)
+├── config/           # YAML experiment configs
 ├── models/           # Pretrained checkpoints
-├── modules/          # Model architectures (ERFNet, DeepLabV3+, UNet)
+├── runs/             # Training outputs and logs
+├── modules/          # Model architectures and losses
 ├── datasets/         # Data loaders and augmentations
 ├── callbacks/        # Training callbacks
 ├── scripts/          # Shell scripts
-│   ├── train.sh      # Training runner
-│   ├── val.sh        # Validation runner
-│   └── predict.sh    # Prediction runner
-└── tools/            # Python utility scripts
-    ├── calculate_class_weights.py
-    ├── calculate_means_stds.py
-    └── visualize.py
+└── tools/            # Utility scripts
 ```
 
 ## Usage
 
-### Train ERFNet
+Shell scripts under `scripts/` wrap common workflows:
 
 ```bash
-uv run src/train.py --config ./config/config_erfnet.yaml --export_dir <path-to-export-directory>
+./scripts/train.sh    # Train a model
+./scripts/val.sh      # Run validation
+./scripts/predict.sh  # Run inference
 ```
 
-### Train DeepLabV3+
+Script calls `uv run src/<script>.py` with these flags:
 
-```bash
-uv run src/train.py --config ./config/config_deeplab.yaml --export_dir <path-to-export-directory>
-```
-
-### Test
-
-```bash
-uv run src/test.py --config ./config/config_erfnet.yaml --ckpt_path <path-to-ckpt> --export_dir <path-to-export-directory>
-```
-
-### Inference
-
-```bash
-uv run src/predict.py --config ./config/config_erfnet.yaml --ckpt_path <path-to-ckpt> --export_dir <path-to-export-directory>
-```
-
-### Benchmark (Brain Branch Only)
-
-```bash
-uv run src/benchmark.py --config config/erfnet_predict.yaml --num_warmup 10 --num_passes 3
-```
+| Flag | Description |
+|------|-------------|
+| `--config` | Path to YAML experiment config |
+| `--ckpt_path` | Checkpoint path (auto-downloaded if missing) |
+| `--export_dir` | Output directory for logs and checkpoints |
+| `--resume` | Resume training (auto-detects last checkpoint) |
 
 ## Pretrained Models
 
-Pretrained weights from PRBonn:
+Pretrained weights from PRBonn (auto-downloaded when using `--ckpt_path`):
 - [ERFNet](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-erfnet.ckpt) (24 MB)
 - [DeepLabV3+](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-deeplab.ckpt) (456 MB)
 
@@ -140,6 +108,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Attribution
 
-This project is based on [PRBonn/phenobench-baselines](https://github.com/PRBonn/phenobench-baselines/tree/main/semantic_segmentation) and uses the [PhenoBench dataset](https://www.phenobench.org/) (licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)). The original codebase has been modified for custom training, edge deployment, and testing purposes.
+Code adapted from [PRBonn/phenobench-baselines](https://github.com/PRBonn/phenobench-baselines/tree/main/semantic_segmentation). Trained on the [PhenoBench dataset](https://www.phenobench.org/) ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)).
 
-If you use this code, please cite the original PhenoBench work and the respective model architectures (see [CITATION.md](CITATION.md)).
+If you use the PhenoBench dataset and/or models, please cite accordingly (see [CITATION.md](CITATION.md)).

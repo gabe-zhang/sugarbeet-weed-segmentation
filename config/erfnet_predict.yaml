@@ -67,6 +67,3 @@ visualizers:
   semantic_overlay_visualizer:
     classes_to_colors: {0: [0, 0, 0], 1: [0, 255, 0], 2: [255, 0, 0]}
 postprocessors: null
-  # arg_max_classes_postprocessor: null
-#   probablistic_softmax_postprocessor: null
-#   keep_embeddings_postprocessor: null

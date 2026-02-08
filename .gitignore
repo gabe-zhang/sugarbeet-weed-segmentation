@@ -14,6 +14,10 @@ wandb/
 
 # IDE
 .vscode/
+.claude/
 
 # Notes
 TODO.md
+
+# Archived experiment configs
+config/archive/

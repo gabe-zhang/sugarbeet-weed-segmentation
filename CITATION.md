@@ -1,8 +1,8 @@
 # Citations
 
-## PhenoBench Dataset (Required)
+## PhenoBench Dataset
 
-If you use this code or the PhenoBench dataset, please cite:
+If you use the PhenoBench dataset, please cite:
 
 ```bibtex
 @article{weyler2024pami,
@@ -42,12 +42,12 @@ If you use the ERFNet model, please cite:
 If you use the DeepLabV3+ model, please cite:
 
 ```bibtex
-@inproceedings{chen2018encoder,
-  author = {Liang-Chieh Chen and Yukun Zhu and George Papandreou and
-    Florian Schroff and Hartwig Adam},
-  title = {{Encoder-Decoder with Atrous Separable Convolution for
-    Semantic Image Segmentation}},
-  booktitle = {ECCV},
+@inproceedings{chen2018eccv,
+  author = {Liang-Chieh Chen and Yukun Zhu and
+    George Papandreou and Florian Schroff and Hartwig Adam},
+  title = {{Encoder-Decoder with Atrous Separable Convolution
+    for Semantic Image Segmentation}},
+  booktitle = {Proc. of the European Conf. on Computer Vision (ECCV)},
   year = {2018}
 }
 ```
