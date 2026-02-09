@@ -12,8 +12,7 @@ class ConfigCallback(Callback):
         self.cfg = cfg
 
     def setup(self, trainer, pl_module, stage=None) -> None:
-        exp_id = self.cfg.get("experiment", {}).get("id", "")
-        log_dir = os.path.join(trainer.log_dir, exp_id)
+        log_dir = trainer.default_root_dir
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 

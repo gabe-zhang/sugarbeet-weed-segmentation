@@ -251,7 +251,7 @@ def main():
         name=cfg["experiment"]["id"],
         version="",
         config=cfg,
-        save_dir=args["export_dir"],
+        save_dir=run_dir,
         **wandb_kwargs,
     )
 
