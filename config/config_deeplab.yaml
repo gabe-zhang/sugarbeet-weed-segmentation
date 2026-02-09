@@ -10,6 +10,8 @@ data:
 backbone:
   name: deeplabv3plus_resnet50
   num_classes: 3
+  # ImageNet backbone weights only. Not needed when using
+  # --ckpt_path, which loads the full segmentation model.
   pretrained: false
 train:
   step_settings:
