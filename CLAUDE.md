@@ -1,11 +1,12 @@
 ## Python & Tool Use
-- Use `ruff` to check coding style
-- Do not add Claude co-author in commit messages
+- Use `ruff` to lint and format code
+- Use `ty` to type check
 - On brain device: use `uv run` and `uv pip install`
 - Otherwise: use `uv` to run and manage packages
+- Do not add Claude co-author in commit messages
 
 ## Code Style
-- Use PEP8 style guide for Python coding.
+- Use PEP 8 style guide for Python coding.
 - Limit all lines to a maximum of 79 characters.
 - Do not create summary markdown files unless explicitly told.
 
