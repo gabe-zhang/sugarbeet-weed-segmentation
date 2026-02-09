@@ -585,7 +585,9 @@ def get_criterion(cfg) -> nn.Module:
 
     if loss_name == "dice_ce":
         weights = cfg["train"]["class_weights"]
-        return DiceCELoss(weights)
+        dice_weight = cfg["train"].get("dice_weight", 0.5)
+        ce_weight = cfg["train"].get("ce_weight", 0.5)
+        return DiceCELoss(weights, dice_weight, ce_weight)
 
     if loss_name == "focal":
         weights = cfg["train"].get("class_weights")
