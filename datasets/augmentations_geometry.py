@@ -896,6 +896,109 @@ class CopyPasteWeed:
         return image, anno
 
 
+class MosaicAugmentation:
+    """Stitch 4 images into a 2x2 grid.
+
+    Each image is resized to fill its quadrant. A random
+    center offset adds variety to quadrant proportions.
+
+    Args:
+        prob: Probability of applying mosaic.
+        output_size: Target output size (H, W).
+    """
+
+    def __init__(
+        self,
+        prob: float = 0.5,
+        output_size: Tuple[int, int] = (768, 768),
+    ):
+        self.prob = prob
+        self.output_h, self.output_w = output_size
+
+    def __call__(
+        self,
+        images: List[torch.Tensor],
+        annos: List[torch.Tensor],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Combine 4 image-anno pairs into a mosaic.
+
+        Args:
+            images: List of 4 tensors [C x H x W].
+            annos: List of 4 tensors [1 x H x W].
+
+        Returns:
+            Tuple of (image [C x out_h x out_w],
+                      anno [1 x out_h x out_w]).
+        """
+        assert len(images) == 4 and len(annos) == 4
+
+        oh, ow = self.output_h, self.output_w
+
+        # Random center with +/-25% jitter
+        cy = oh // 2 + random.randint(-oh // 8, oh // 8)
+        cx = ow // 2 + random.randint(-ow // 8, ow // 8)
+
+        c = images[0].shape[0]
+        out_img = torch.zeros(c, oh, ow, dtype=images[0].dtype)
+        out_anno = torch.zeros(1, oh, ow, dtype=annos[0].dtype)
+
+        # Quadrant sizes based on center point
+        sizes = [
+            (cy, cx),
+            (cy, ow - cx),
+            (oh - cy, cx),
+            (oh - cy, ow - cx),
+        ]
+        # Quadrant offsets (top-left corner)
+        offsets = [
+            (0, 0),
+            (0, cx),
+            (cy, 0),
+            (cy, cx),
+        ]
+
+        for i in range(4):
+            qh, qw = sizes[i]
+            if qh <= 0 or qw <= 0:
+                continue
+            oy, ox = offsets[i]
+
+            img_r = functional.resize(
+                images[i],
+                [qh, qw],
+                interpolation=transforms.InterpolationMode.BILINEAR,
+                antialias=True,
+            )
+            anno_r = functional.resize(
+                annos[i],
+                [qh, qw],
+                interpolation=transforms.InterpolationMode.NEAREST,
+            )
+
+            out_img[:, oy : oy + qh, ox : ox + qw] = img_r
+            out_anno[:, oy : oy + qh, ox : ox + qw] = anno_r
+
+        return out_img, out_anno
+
+
+def get_mosaic_augmentation(cfg, stage: str) -> Optional["MosaicAugmentation"]:
+    """Return MosaicAugmentation if configured, else None."""
+    if stage != "train":
+        return None
+    aug_cfg = cfg.get(stage, {}).get("mosaic")
+    if aug_cfg is None:
+        return None
+    # Derive output size from random_crop config
+    geo_cfg = cfg.get(stage, {}).get("geometric_data_augmentations", {})
+    crop_cfg = geo_cfg.get("random_crop", {})
+    h = crop_cfg.get("height", 768)
+    w = crop_cfg.get("width", 768)
+    return MosaicAugmentation(
+        prob=aug_cfg.get("prob", 0.5),
+        output_size=(h, w),
+    )
+
+
 def get_copy_paste_augmentation(cfg, stage: str) -> Optional["CopyPasteWeed"]:
     """Return CopyPasteWeed if configured, else None."""
     if stage != "train":

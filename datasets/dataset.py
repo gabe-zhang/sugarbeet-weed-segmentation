@@ -20,8 +20,10 @@ from datasets.augmentations_color import get_color_augmentations
 from datasets.augmentations_geometry import (
     CopyPasteWeed,
     GeometricDataAugmentation,
+    MosaicAugmentation,
     get_copy_paste_augmentation,
     get_geometric_augmentations,
+    get_mosaic_augmentation,
 )
 from datasets.image_normalizer import ImageNormalizer, get_image_normalizer
 
@@ -57,8 +59,9 @@ class SegmentationDataset(Dataset):
         augmentations_geometric: List[GeometricDataAugmentation],
         augmentations_color: List[Callable],
         copy_paste: Optional[CopyPasteWeed] = None,
+        mosaic: Optional[MosaicAugmentation] = None,
     ):
-        """Get the path to all images and its corresponding annotations.
+        """Get the path to all images and annotations.
 
         Args:
             path_to_dataset: Path to dataset directory.
@@ -68,6 +71,7 @@ class SegmentationDataset(Dataset):
                 applied to image and annotation.
             augmentations_color: Color augmentations
                 applied to the image.
+            mosaic: Optional mosaic augmentation.
         """
 
         assert os.path.exists(path_to_dataset), (
@@ -83,6 +87,7 @@ class SegmentationDataset(Dataset):
         self.augmentations_geometric = augmentations_geometric
         self.augmentations_color = augmentations_color
         self.copy_paste = copy_paste
+        self.mosaic = mosaic
 
         # ------------- Prepare Training -------------
         if self.mode == "train":
@@ -120,36 +125,56 @@ class SegmentationDataset(Dataset):
         # specify image transformations
         self.img_to_tensor = transforms.ToTensor()
 
-    def get_train_item(self, idx: int) -> Dict:
-        path_to_current_img = os.path.join(
-            self.path_to_train_images, self.filenames_train[idx]
+    def _load_raw(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Load raw image and annotation tensors.
+
+        Returns:
+            (image [C x H x W], anno [1 x H x W])
+        """
+        path_img = os.path.join(
+            self.path_to_train_images,
+            self.filenames_train[idx],
         )
-        img_pil = Image.open(path_to_current_img)
-        img = self.img_to_tensor(img_pil)  # [C x H x W] with values in [0, 1]
+        img = self.img_to_tensor(Image.open(path_img))
+
+        path_anno = os.path.join(
+            self.path_to_train_annos,
+            self.filenames_train[idx],
+        )
+        anno = np.array(Image.open(path_anno))
+        if len(anno.shape) > 2:
+            anno = anno[:, :, 0]
+        anno = torch.tensor(
+            anno.astype(np.int64), dtype=torch.int64
+        ).unsqueeze(0)
+
+        # Remap labels
+        anno[anno == 3] = 1
+        anno[anno == 4] = 2
+
+        return img, anno
+
+    def get_train_item(self, idx: int) -> Dict:
+        # Mosaic: stitch 4 images before augmentations
+        if self.mosaic is not None and random.random() < self.mosaic.prob:
+            n = len(self.filenames_train)
+            indices = [idx] + [random.randint(0, n - 1) for _ in range(3)]
+            images, annos = [], []
+            for i in indices:
+                img_i, anno_i = self._load_raw(i)
+                images.append(img_i)
+                annos.append(anno_i)
+            img, anno = self.mosaic(images, annos)
+        else:
+            img, anno = self._load_raw(idx)
 
         if random.random() > 0.25:
             for augmentor_color_fn in self.augmentations_color:
                 img = augmentor_color_fn(img)
 
-        path_to_current_anno = os.path.join(
-            self.path_to_train_annos, self.filenames_train[idx]
-        )
-        anno = np.array(Image.open(path_to_current_anno))  # dtype: int32
-        if len(anno.shape) > 2:
-            anno = anno[:, :, 0]
-        anno = anno.astype(np.int64)
-        anno = torch.Tensor(anno).type(torch.int64)  # [H x W]
-        anno = anno.unsqueeze(0)  # [1 x H x W]
-
         for augmentor_geometric in self.augmentations_geometric:
             img, anno = augmentor_geometric(img, anno)
         anno = anno.squeeze(0)  # [H x W]
-
-        mask_3 = anno == 3
-        anno[mask_3] = 1
-
-        mask_4 = anno == 4
-        anno[mask_4] = 2
 
         if self.copy_paste is not None:
             donor_idx = random.randint(0, len(self.filenames_train) - 1)
@@ -326,6 +351,7 @@ class SegmentationDataModule(pl.LightningDataModule):
                 self.cfg, "train"
             )
             train_copy_paste = get_copy_paste_augmentation(self.cfg, "train")
+            train_mosaic = get_mosaic_augmentation(self.cfg, "train")
             self.train_ds = SegmentationDataset(
                 path_to_dataset,
                 mode="train",
@@ -333,6 +359,7 @@ class SegmentationDataModule(pl.LightningDataModule):
                 augmentations_geometric=train_augmentations_geometric,
                 augmentations_color=train_augmentations_color,
                 copy_paste=train_copy_paste,
+                mosaic=train_mosaic,
             )
 
             # ----------- VAL -----------
