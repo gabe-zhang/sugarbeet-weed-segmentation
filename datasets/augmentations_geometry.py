@@ -1,6 +1,6 @@
-"""Define a set of geometric data augmentations which can be applied to the input image and its corresponding annotations.
+"""Geometric data augmentations for semantic segmentation.
 
-This is relevant for the task of semantic segmentation since the input image and its annotation need to be treated in the same way.
+Applies identical transforms to both image and annotation.
 """
 
 import math
@@ -12,23 +12,24 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as functional
+from scipy.ndimage import label as ndimage_label
 
 
 class GeometricDataAugmentation(ABC):
-    """General transformation which can be applied simultaneously to the input image and its corresponding anntations."""
+    """Transform applied to image and annotation."""
 
     @abstractmethod
     def __call__(
         self, image: torch.Tensor, anno: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Apply a geometric transformation to a given image and its corresponding annotation.
+        """Apply a geometric transformation.
 
         Args:
-          image (torch.Tensor): input image to be transformed.
-          anno (torch.Tensor): annotation to be transformed.
+          image: input image to be transformed.
+          anno: annotation to be transformed.
 
         Returns:
-          Tuple[torch.Tensor, torch.Tensor]: transformed image and its corresponding annotation
+          Transformed image and annotation.
         """
         raise NotImplementedError
 
@@ -38,13 +39,22 @@ class ResizeTransform(GeometricDataAugmentation):
         self.h = 536
         self.w = 960
 
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self,
+        image: torch.Tensor,
+        anno: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         resized_img = functional.resize(
             image,
             size=[self.h, self.w],
             interpolation=transforms.InterpolationMode.BILINEAR,
         )
-        return resized_img
+        resized_anno = functional.resize(
+            anno,
+            size=[self.h, self.w],
+            interpolation=transforms.InterpolationMode.NEAREST,
+        )
+        return resized_img, resized_anno
 
 
 class RandomTranslationTransform(GeometricDataAugmentation):
@@ -76,14 +86,18 @@ class RandomTranslationTransform(GeometricDataAugmentation):
 
         h, w = image.shape[1], image.shape[2]
         if -1 < self.min_translation < 1:
-            tx = int(random.uniform(
-                self.min_translation * w,
-                self.max_translation * w,
-            ))
-            ty = int(random.uniform(
-                self.min_translation * h,
-                self.max_translation * h,
-            ))
+            tx = int(
+                random.uniform(
+                    self.min_translation * w,
+                    self.max_translation * w,
+                )
+            )
+            ty = int(
+                random.uniform(
+                    self.min_translation * h,
+                    self.max_translation * h,
+                )
+            )
         else:
             tx = random.randint(
                 int(self.min_translation),
@@ -155,14 +169,14 @@ class RandomRotationTransform(GeometricDataAugmentation):
 
 
 class RandomGaussianRotationTransform(GeometricDataAugmentation):
-    """Randomly rotate an image and its annotation by a random angle specified by a gaussian."""
+    """Rotate by a Gaussian-sampled angle."""
 
     def __init__(self, mean: float = 0.0, std: float = 0.0):
-        """Randomly rotate an image and its annotation by a random angle specified by a gaussian.
+        """Rotate by a Gaussian-sampled angle.
 
         Args:
-            mean (float, optional): mean rotation angle in radians. Defaults to 0.0.
-            std (float, optional): standard deviation of mean rotation angle in radians. Defaults to 0.0.
+            mean: mean rotation angle in radians.
+            std: std of rotation angle in radians.
         """
         self.mean = mean
         self.std = std
@@ -202,7 +216,7 @@ class RandomHorizontalFlipTransform(GeometricDataAugmentation):
         """Apply random horizontal flipping.
 
         Args:
-            prob (float, optional): probability of the image being flipped. Defaults to 0.5.
+            prob: probability of flipping.
         """
         assert prob >= 0.0
         assert prob <= 1.0
@@ -235,7 +249,7 @@ class RandomVerticalFlipTransform(GeometricDataAugmentation):
         """Apply random vertical flipping.
 
         Args:
-            prob (float, optional): probability of the image being flipped. Defaults to 0.5.
+            prob: probability of flipping.
         """
         assert prob >= 0.0
         assert prob <= 1.0
@@ -272,46 +286,62 @@ class CenterCropTransform(GeometricDataAugmentation):
         """Set height and width of cropping region.
 
         Args:
-            crop_height (Optional[int], optional): Height of cropping region. Defaults to None.
-            crop_width (Optional[int], optional): Width of cropping region. Defaults to None.
+            crop_height: Height of cropping region.
+            crop_width: Width of cropping region.
         """
         self.crop_height = crop_height
         self.crop_width = crop_width
 
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, image: torch.Tensor, anno: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if (self.crop_height is None) or (self.crop_width is None):
-            return image
+            return image, anno
 
         img_chans, img_height, img_width = image.shape[:3]
+        anno_chans = anno.shape[0]
 
         if self.crop_width > img_width:
             raise ValueError(
-                "Width of cropping region must not be greather than img width"
+                "Crop width must not exceed image width"
             )
         if self.crop_height > img_height:
             raise ValueError(
-                "Height of cropping region must not be greather than img height."
+                "Crop height must not exceed image height"
             )
 
         image_cropped = functional.center_crop(
             image, [self.crop_height, self.crop_width]
         )
+        anno_cropped = functional.center_crop(
+            anno, [self.crop_height, self.crop_width]
+        )
 
         assert image_cropped.shape[0] == img_chans, (
-            "Cropped image has an unexpected number of channels."
+            "Cropped image has unexpected channels."
         )
         assert image_cropped.shape[1] == self.crop_height, (
-            "Cropped image has not the desired size."
+            "Cropped image has wrong height."
         )
         assert image_cropped.shape[2] == self.crop_width, (
-            "Cropped image has not the desired width."
+            "Cropped image has wrong width."
         )
 
-        return image_cropped
+        assert anno_cropped.shape[0] == anno_chans, (
+            "Cropped anno has unexpected channels."
+        )
+        assert anno_cropped.shape[1] == self.crop_height, (
+            "Cropped anno has wrong height."
+        )
+        assert anno_cropped.shape[2] == self.crop_width, (
+            "Cropped anno has wrong width."
+        )
+
+        return image_cropped, anno_cropped
 
 
 class RandomCropTransform(GeometricDataAugmentation):
-    """Extract a random patch from a given image and its corresponding annnotation."""
+    """Extract a random patch from image and annotation."""
 
     def __init__(
         self,
@@ -321,8 +351,8 @@ class RandomCropTransform(GeometricDataAugmentation):
         """Set height and width of cropping region.
 
         Args:
-          crop_height (Optional[int], optional): Height of cropping region. Defaults to None.
-          crop_width (Optional[int], optional): Width of cropping region. Defaults to None.
+          crop_height: Height of cropping region.
+          crop_width: Width of cropping region.
         """
         self.crop_height = crop_height
         self.crop_width = crop_width
@@ -346,11 +376,13 @@ class RandomCropTransform(GeometricDataAugmentation):
 
         if self.crop_width > img_width:
             raise ValueError(
-                f"Width of cropping region must not be greather than img width: {self.crop_width} vs {img_width}"
+                f"Crop width exceeds image width:"
+                f" {self.crop_width} vs {img_width}"
             )
         if self.crop_height > img_height:
             raise ValueError(
-                f"Height of cropping region must not be greather than img height: {self.crop_height} vs {img_height}."
+                f"Crop height exceeds image height:"
+                f" {self.crop_height} vs {img_height}"
             )
 
         max_x = img_width - self.crop_width
@@ -405,7 +437,7 @@ class MyRandomScaleTransform(GeometricDataAugmentation):
         Args:
             min_scale (float): minimum scaling factor.
             max_scale (float): maximum scaling factor.
-            prob (float, optional): probability of the image being scaled. Defaults to 0.5.
+            prob: probability of scaling.
         """
         assert prob >= 0.0
         assert prob <= 1.0
@@ -466,17 +498,23 @@ class MyRandomScaleTransform(GeometricDataAugmentation):
 
 
 class MyRandomAspectRatioTransform(GeometricDataAugmentation):
-    """Rescaling the image and its annotation in one dimension (width or height) to diversify the aspect ratio."""
+    """Rescale in one dimension to diversify aspect ratio."""
 
-    def __init__(self, min_scale: float, max_scale: float, prob: float = 0.5):
-        """Rescaling the image and its annotation in one dimension (width or height) to diversify the aspect ratio.
+    def __init__(
+        self,
+        min_scale: float,
+        max_scale: float,
+        prob: float = 0.5,
+    ):
+        """Rescale in one dimension.
 
-        This augmentation is proposed in: http://www.robesafe.es/personal/eduardo.romera/pdfs/Romera18iv.pdf
+        See: http://www.robesafe.es/personal/
+        eduardo.romera/pdfs/Romera18iv.pdf
 
         Args:
             min_scale (float): minimum scaling factor.
             max_scale (float): maximum scaling factor.
-            prob (float, optional): probability of the image being scaled. Defaults to 0.5.
+            prob: probability of scaling.
         """
         assert prob >= 0.0
         assert prob <= 1.0
@@ -544,7 +582,7 @@ class MyRandomShearTransform(GeometricDataAugmentation):
         Args:
             x_shear (float): maximum shear along x-axis (in degrees).
             y_shear (float): maximum shear along y-axis (in degrees).
-            prob (float, optional): probability of the image being sheared. Defaults to 0.5.
+            prob: probability of shearing.
         """
         assert prob >= 0.0
         assert prob <= 1.0
@@ -627,23 +665,30 @@ class MyPaddingTransform(GeometricDataAugmentation):
         """Apply padding to right and bottom"""
         self.divisor = divisor
 
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        """Pads an image tensor's height and width to be a multiple of a given divisor."""
+    def __call__(
+        self, image: torch.Tensor, anno: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Pad image/anno height+width to a multiple of divisor."""
         img_height, img_width = image.shape[-2:]
         pad_h = 0
         pad_w = 0
 
         if img_height % self.divisor != 0:
-            self.divisor - (img_height % self.divisor)
+            pad_h = self.divisor - (img_height % self.divisor)
 
         if img_width % self.divisor != 0:
-            self.divisor - (img_width % self.divisor)
+            pad_w = self.divisor - (img_width % self.divisor)
 
         padded_img = functional.pad(
-            image, (0, pad_w, 0, pad_h), "constant", value=0
+            image, [0, 0, pad_w, pad_h],
+            fill=0, padding_mode="constant",
+        )
+        padded_anno = functional.pad(
+            anno, [0, 0, pad_w, pad_h],
+            fill=0, padding_mode="constant",
         )
 
-        return padded_img
+        return padded_img, padded_anno
 
 
 def get_geometric_augmentations(
@@ -775,6 +820,7 @@ class CopyPasteWeed:
     def __init__(
         self,
         weed_class: int = 2,
+        soil_class: int = 0,
         prob: float = 0.5,
         max_instances: int = 3,
     ):
@@ -782,12 +828,14 @@ class CopyPasteWeed:
 
         Args:
             weed_class: class index for weeds. Default: 2.
+            soil_class: class index for soil. Default: 0.
             prob: probability of applying the augmentation.
             max_instances: max weed instances to paste.
         """
         assert 0.0 <= prob <= 1.0
         assert max_instances >= 1
         self.weed_class = weed_class
+        self.soil_class = soil_class
         self.prob = prob
         self.max_instances = max_instances
 
@@ -812,14 +860,12 @@ class CopyPasteWeed:
         if random.random() > self.prob:
             return image, anno
 
-        weed_mask = donor_anno == self.weed_class
-        if not weed_mask.any():
+        donor_anno_np = donor_anno.cpu().numpy()
+        weed_np = (donor_anno_np == self.weed_class).astype(np.uint8)
+        if not weed_np.any():
             return image, anno
 
-        weed_np = weed_mask.cpu().numpy().astype(np.uint8)
-        from scipy import ndimage
-
-        labeled, n_instances = ndimage.label(weed_np)
+        labeled, n_instances = ndimage_label(weed_np)
         if n_instances == 0:
             return image, anno
 
@@ -827,21 +873,30 @@ class CopyPasteWeed:
         random.shuffle(indices)
         selected = indices[: self.max_instances]
 
+        # Build combined mask in numpy, skip high-overlap
+        anno_np = anno.cpu().numpy()
+        combined = np.zeros_like(weed_np, dtype=bool)
+        for inst_id in selected:
+            inst_mask = labeled == inst_id
+            non_soil = anno_np[inst_mask] != self.soil_class
+            if non_soil.sum() > 0.5 * inst_mask.sum():
+                continue
+            combined |= inst_mask
+
+        if not combined.any():
+            return image, anno
+
+        # Single tensor conversion and paste
+        mask_t = torch.from_numpy(combined).to(image.device)
         image = image.clone()
         anno = anno.clone()
-        for inst_id in selected:
-            mask = torch.from_numpy(
-                labeled == inst_id
-            ).to(image.device)
-            image[:, mask] = donor_image[:, mask]
-            anno[mask] = self.weed_class
+        image[:, mask_t] = donor_image[:, mask_t]
+        anno[mask_t] = self.weed_class
 
         return image, anno
 
 
-def get_copy_paste_augmentation(
-    cfg, stage: str
-) -> Optional["CopyPasteWeed"]:
+def get_copy_paste_augmentation(cfg, stage: str) -> Optional["CopyPasteWeed"]:
     """Return CopyPasteWeed if configured, else None."""
     if stage != "train":
         return None
@@ -850,6 +905,7 @@ def get_copy_paste_augmentation(
         return None
     return CopyPasteWeed(
         weed_class=aug_cfg.get("weed_class", 2),
+        soil_class=aug_cfg.get("soil_class", 0),
         prob=aug_cfg.get("prob", 0.5),
         max_instances=aug_cfg.get("max_instances", 3),
     )
