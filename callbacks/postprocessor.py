@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import skimage.io
@@ -17,13 +17,17 @@ class Postprocessor(ABC):
     def process_logits(
         self, logits: torch.Tensor
     ) -> Union[torch.Tensor, None]:
-        """Perform a post-processing of the logits predicted by a semantic segmentation network.
+        """Perform a post-processing of the logits
+        predicted by a semantic segmentation network.
 
         Args:
-            logits (torch.Tensor): logits of shape [batch_size x num_classes x H x W]
+            logits (torch.Tensor): logits of shape
+                [batch_size x num_classes x H x W]
 
         Returns:
-            torch.Tensor: post-processed logits of shape [batch_size x ? x H x W] (? := depends on implementation)
+            torch.Tensor: post-processed logits of
+                shape [batch_size x ? x H x W]
+                (? := depends on implementation)
         """
         raise NotImplementedError
 
@@ -31,13 +35,18 @@ class Postprocessor(ABC):
     def process_embeddings(
         self, embeddings: torch.Tensor
     ) -> Union[torch.Tensor, None]:
-        """Perform a post-processing of the embeddigns computed by the network
+        """Perform a post-processing of the
+        embeddigns computed by the network
 
         Args:
-            embeddings (torch.Tensor): embeddings of shape [batch_size x emb_dim x H x W]
+            embeddings (torch.Tensor): embeddings
+                of shape
+                [batch_size x emb_dim x H x W]
 
         Returns:
-            torch.Tensor: post-processed embeddings of shape [batch_size x ? x H x W] (? := depends on implementation)
+            torch.Tensor: post-processed embeddings
+                of shape [batch_size x ? x H x W]
+                (? := depends on implementation)
         """
         raise NotImplementedError
 
@@ -51,9 +60,15 @@ class Postprocessor(ABC):
         """Save processed outputs created by this class.
 
         Args:
-            processed_logits (torch.Tensor): post-processed output of shape [batch_size x ? x H x W] (? := depends on implementation)
-            path_to_dir (str): path to output directory
-            fnames (List[str]): raw filenames with fileformat (len(fnames)==batch_size)
+            processed_logits (torch.Tensor):
+                post-processed output of shape
+                [batch_size x ? x H x W]
+                (? := depends on implementation)
+            path_to_dir (str): path to output
+                directory
+            fnames (List[str]): raw filenames with
+                fileformat
+                (len(fnames)==batch_size)
         """
         raise NotImplementedError
 
@@ -67,15 +82,22 @@ class Postprocessor(ABC):
         """Save processed outputs created by this class.
 
         Args:
-            processed_logits (torch.Tensor): post-processed output of shape [batch_size x ? x H x W] (? := depends on implementation)
-            path_to_dir (str): path to output directory
-            fnames (List[str]): raw filenames with fileformat (len(fnames)==batch_size)
+            processed_logits (torch.Tensor):
+                post-processed output of shape
+                [batch_size x ? x H x W]
+                (? := depends on implementation)
+            path_to_dir (str): path to output
+                directory
+            fnames (List[str]): raw filenames with
+                fileformat
+                (len(fnames)==batch_size)
         """
         raise NotImplementedError
 
 
 class KeepLogitsPostprocessor(Postprocessor):
-    """Just keep the predicted logits and do not perform any further processing."""
+    """Just keep the predicted logits and do not
+    perform any further processing."""
 
     def __init__(self):
         self.name = "logits"
@@ -83,10 +105,12 @@ class KeepLogitsPostprocessor(Postprocessor):
     def process_logits(
         self, logits: torch.Tensor
     ) -> Union[torch.Tensor, None]:
-        """This method just returns the logits and does not perform any processing.
+        """This method just returns the logits
+        and does not perform any processing.
 
         Args:
-            logits (torch.Tensor): logits of shape [batch_size x num_classes x H x W]
+            logits (torch.Tensor): logits of shape
+                [batch_size x num_classes x H x W]
 
         Returns:
             torch.Tensor: logits of shape [batch_size x num_classes x H x W]
@@ -202,10 +226,13 @@ class ProbablisticSoftmaxPostprocessor(Postprocessor):
         """Convert the predicted logits into softmax probabilities.
 
         Args:
-            logits (torch.Tensor): logits of shape [batch_size x num_classes x H x W]
+            logits (torch.Tensor): logits of shape
+                [batch_size x num_classes x H x W]
 
         Returns:
-            torch.Tensor: class probabilities of shape [batch_size x num_classes x H x W]
+            torch.Tensor: class probabilities of
+                shape
+                [batch_size x num_classes x H x W]
         """
         assert len(logits.shape) == 4
 
@@ -229,9 +256,13 @@ class ProbablisticSoftmaxPostprocessor(Postprocessor):
         """Save predicted probabilites for each image as a tiff image.
 
         Args:
-            processed_logits (torch.Tensor): post-processed logits of shape [batch_size x num_classes x H x W]
-            path_to_dir (str): path to output directory
-            fnames (List[str]): raw filenames with fileformat
+            processed_logits (torch.Tensor):
+                post-processed logits of shape
+                [batch_size x num_classes x H x W]
+            path_to_dir (str): path to output
+                directory
+            fnames (List[str]): raw filenames with
+                fileformat
         """
         if processed_logits is None:
             return
@@ -261,7 +292,7 @@ class ProbablisticSoftmaxPostprocessor(Postprocessor):
 
     def save_postprocessed_embeddings(
         self,
-        processed_embeddings: torch.Tensor,
+        processed_embeddings: Union[torch.Tensor, None],
         path_to_dir: str,
         fnames: List[str],
     ) -> None:
@@ -278,10 +309,12 @@ class ArgMaxClassPostprocessor(Postprocessor):
         """Convert the predicted logits into class ids.
 
         Args:
-            logits (torch.Tensor): logits of shape [batch_size x num_classes x H x W]
+            logits (torch.Tensor): logits of shape
+                [batch_size x num_classes x H x W]
 
         Returns:
-            torch.Tensor: class probabilities of shape [batch_size x H x W]
+            torch.Tensor: class probabilities of
+                shape [batch_size x H x W]
         """
         assert len(logits.shape) == 4
 
@@ -300,12 +333,17 @@ class ArgMaxClassPostprocessor(Postprocessor):
         path_to_dir: str,
         fnames: List[str],
     ) -> None:
-        """Save predicted probabilites for each image as a tiff image.
+        """Save predicted probabilites for each
+        image as a tiff image.
 
         Args:
-            processed_logits (torch.Tensor): post-processed logits of shape [batch_size x H x W]
-            path_to_dir (str): path to output directory
-            fnames (List[str]): raw filenames with fileformat
+            processed_logits (torch.Tensor):
+                post-processed logits of shape
+                [batch_size x H x W]
+            path_to_dir (str): path to output
+                directory
+            fnames (List[str]): raw filenames with
+                fileformat
         """
         if processed_logits is None:
             return
@@ -335,7 +373,7 @@ class ArgMaxClassPostprocessor(Postprocessor):
 
     def save_postprocessed_embeddings(
         self,
-        processed_embeddings: torch.Tensor,
+        processed_embeddings: Union[torch.Tensor, None],
         path_to_dir: str,
         fnames: List[str],
     ) -> None:
@@ -379,8 +417,12 @@ class PostprocessorrCallback(Callback):
         """Constructor.
 
         Args:
-            postprocess_train_every_x_epochs (int): Frequency of train postprocessing. Defaults to 1.
-            postprocess_val_every_x_epochs (int): Frequency of val postprocessing. Defaults to 1.
+            postprocess_train_every_x_epochs (int):
+                Frequency of train postprocessing.
+                Defaults to 1.
+            postprocess_val_every_x_epochs (int):
+                Frequency of val postprocessing.
+                Defaults to 1.
         """
         super().__init__()
         self.postprocessors = postprocessors
@@ -390,7 +432,7 @@ class PostprocessorrCallback(Callback):
         self.postprocess_val_every_x_epochs = postprocess_val_every_x_epochs
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs: Dict[str, Any], batch, batch_idx
+        self, trainer, pl_module, outputs, batch, batch_idx
     ):
         # visualize
         epoch = trainer.current_epoch
@@ -420,7 +462,13 @@ class PostprocessorrCallback(Callback):
                     )
 
     def on_validation_batch_end(
-        self, trainer, pl_module, outputs: Dict[str, Any], batch, batch_idx
+        self,
+        trainer,
+        pl_module,
+        outputs,
+        batch,
+        batch_idx,
+        dataloader_idx=0,
     ):
         # visualize
         epoch = trainer.current_epoch
@@ -448,29 +496,14 @@ class PostprocessorrCallback(Callback):
                         processed_embeddings, path, batch["fname"]
                     )
 
-    def on_test_batch_end(
-        self, trainer, pl_module, outputs: Dict[str, Any], batch, batch_idx
-    ):
-        # visualize
-        path = os.path.join(trainer.log_dir, "postprocess")
-
-        for postprocessor in self.postprocessors:
-            processed_logits = postprocessor.process_logits(outputs["logits"])
-            postprocessor.save_postprocessed_logits(
-                processed_logits, path, batch["fname"]
-            )
-
-            # process embeddings
-            if "embeddings" in outputs.keys():
-                processed_embeddings = postprocessor.process_embeddings(
-                    outputs["embeddings"]
-                )
-                postprocessor.save_postprocessed_embeddings(
-                    processed_embeddings, path, batch["fname"]
-                )
-
     def on_predict_batch_end(
-        self, trainer, pl_module, outputs: Dict[str, Any], batch, batch_idx
+        self,
+        trainer,
+        pl_module,
+        outputs,
+        batch,
+        batch_idx,
+        dataloader_idx=0,
     ):
         # visualize
         path = os.path.join(trainer.log_dir, "postprocess")

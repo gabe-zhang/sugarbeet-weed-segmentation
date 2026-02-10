@@ -1,4 +1,3 @@
-import colorsys
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
@@ -233,9 +232,12 @@ class SemanticsOverlayCorrectIncorrectVisualizer(BasicVisualizer):
                     canvas[:, mask_correct_pred] = color_correct_tensor
 
                     # visualize incorrect predictions
-                    # 0 Soil (Black) -> Error = Blue (Missed object - False Negatives)
-                    # 1 Crop (Green) -> Error = Cyan (False Crop - False Positive)
-                    # 2 Weed (Red)   -> Error = Magenta (False Weed - False Positive)
+                    # 0 Soil (Black) -> Error = Blue
+                    #   (Missed object - False Negatives)
+                    # 1 Crop (Green) -> Error = Cyan
+                    #   (False Crop - False Positive)
+                    # 2 Weed (Red) -> Error = Magenta
+                    #   (False Weed - False Positive)
 
                     if class_id == 0:
                         err_rgb = [0, 80, 255]  # Bright Blue
@@ -388,16 +390,14 @@ class VisualizerCallback(Callback):
         self,
         trainer,
         pl_module,
-        outputs: Dict[str, Any],
+        outputs,
         batch,
         batch_idx,
     ):
         # visualize
         epoch = trainer.current_epoch
         if (epoch % self.vis_train_every_x_epochs) == 0 and (epoch != 0):
-            path = os.path.join(
-                trainer.log_dir, "train", f"epoch-{epoch:06d}"
-            )
+            path = os.path.join(trainer.log_dir, "train", f"epoch-{epoch:06d}")
 
             for visualizer in self.visualizers:
                 visualizer.save_visualize_batch(path, outputs, batch)
@@ -406,42 +406,28 @@ class VisualizerCallback(Callback):
         self,
         trainer,
         pl_module,
-        outputs: Dict[str, Any],
+        outputs,
         batch,
         batch_idx,
+        dataloader_idx=0,
     ):
         # visualize
         epoch = trainer.current_epoch
 
         if ((epoch + 1) % self.vis_val_every_x_epochs) == 0 and (epoch != 0):
-            path = os.path.join(
-                trainer.log_dir, "val", f"epoch-{epoch:06d}"
-            )
+            path = os.path.join(trainer.log_dir, "val", f"epoch-{epoch:06d}")
 
             for visualizer in self.visualizers:
                 visualizer.save_visualize_batch(path, outputs, batch)
-
-    def on_test_batch_end(
-        self,
-        trainer,
-        pl_module,
-        outputs: Dict[str, Any],
-        batch,
-        batch_idx,
-    ):
-        # visualize
-        path = trainer.log_dir
-
-        for visualizer in self.visualizers:
-            visualizer.save_visualize_batch(path, outputs, batch)
 
     def on_predict_batch_end(
         self,
         trainer,
         pl_module,
-        outputs: Dict[str, Any],
+        outputs,
         batch,
         batch_idx,
+        dataloader_idx=0,
     ):
         # visualize
         path = trainer.log_dir
