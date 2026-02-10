@@ -978,6 +978,7 @@ class MosaicAugmentation:
             out_img[:, oy : oy + qh, ox : ox + qw] = img_r
             out_anno[:, oy : oy + qh, ox : ox + qw] = anno_r
 
+        out_img.clamp_(0.0, 1.0)
         return out_img, out_anno
 
 
