@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from modules.deeplab.modeling import deeplabv3plus_resnet50
 from modules.erfnet.erfnet_modified import ERFNetModel
-from modules.losses import get_criterion
+from modules.losses import get_criterion as get_criterion
 
 
 def get_backbone(cfg: Dict) -> nn.Module:

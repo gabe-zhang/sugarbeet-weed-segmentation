@@ -47,7 +47,7 @@ def get_git_commit_hash() -> str:
     return result.stdout.strip()
 
 
-def parse_args() -> Dict[str, str]:
+def parse_args() -> Dict:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--export_dir",
@@ -120,7 +120,7 @@ def find_last_checkpoint(export_dir: str) -> Optional[str]:
     if not matches:
         return None
     latest = max(matches, key=os.path.getmtime)
-    return latest
+    return str(latest)
 
 
 def find_wandb_run_id(export_dir: str) -> Optional[str]:
@@ -128,14 +128,12 @@ def find_wandb_run_id(export_dir: str) -> Optional[str]:
     wandb_dir = os.path.join(export_dir, "wandb")
     if not os.path.isdir(wandb_dir):
         return None
-    run_dirs = glob.glob(
-        os.path.join(wandb_dir, "run-*")
-    )
+    run_dirs = glob.glob(os.path.join(wandb_dir, "run-*"))
     if not run_dirs:
         return None
     latest = max(run_dirs, key=os.path.getmtime)
     # run dir format: run-YYYYMMDD_HHMMSS-<run_id>
-    run_id = os.path.basename(latest).split("-")[-1]
+    run_id = os.path.basename(str(latest)).split("-")[-1]
     return run_id
 
 
@@ -199,9 +197,7 @@ def main():
         )
 
     # Setup run directory: runs/<experiment_id>/
-    run_dir = os.path.join(
-        args["export_dir"], cfg["experiment"]["id"]
-    )
+    run_dir = os.path.join(args["export_dir"], cfg["experiment"]["id"])
     ckpt_dir = os.path.join(run_dir, "checkpoints")
 
     # Add callbacks
@@ -299,9 +295,11 @@ def main():
     # Log training completion status
     best_score = checkpoint_best_val_mIoU.best_model_score
     best_path = checkpoint_best_val_mIoU.best_model_path
-    best_epoch = int(
-        os.path.basename(best_path).split("epoch=")[1].split("_")[0]
-    ) if best_path else -1
+    best_epoch = (
+        int(os.path.basename(best_path).split("epoch=")[1].split("_")[0])
+        if best_path
+        else -1
+    )
     if early_stopping.stopped_epoch > 0:
         print(
             f"\nTraining stopped early by EarlyStopping "
@@ -312,9 +310,7 @@ def main():
             f"\nTraining completed successfully for "
             f"{trainer.current_epoch + 1} epochs"
         )
-    print(
-        f"Best val_mIoU: {best_score:.4f} at epoch {best_epoch}"
-    )
+    print(f"Best val_mIoU: {best_score:.4f} at epoch {best_epoch}")
 
 
 if __name__ == "__main__":

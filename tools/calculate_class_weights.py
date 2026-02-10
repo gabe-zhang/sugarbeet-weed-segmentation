@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Compute class weights for semantic segmentation based on ground truth annotations"""
+"""Compute class weights for semantic segmentation.
+
+Based on ground truth annotations.
+"""
 
 import argparse
 import math

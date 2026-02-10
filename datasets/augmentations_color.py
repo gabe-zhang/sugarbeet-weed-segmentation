@@ -1,4 +1,7 @@
-"""Define a set of geometric color data augmentations which can be applied to the input image.
+"""Color data augmentations for the input image.
+
+Define a set of geometric color data augmentations
+which can be applied to the input image.
 
 Note that the annotations is not affected in any way.
 """
@@ -24,12 +27,14 @@ def rgb_to_hsv(image: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     The image data is assumed to be in the range of (0, 1).
 
     Args:
-        image: RGB Image to be converted to HSV with shape of :math:`(*, 3, H, W)`.
+        image: RGB Image to be converted to HSV with shape
+            of :math:`(*, 3, H, W)`.
         eps: scalar to enforce numarical stability.
 
     Returns:
         HSV version of the image with shape of :math:`(*, 3, H, W)`.
-        The H channel values are in the range 0..2pi. S and V are in the range 0..1.
+        The H channel values are in the range 0..2pi.
+        S and V are in the range 0..1.
 
     .. note::
        See a working example `here <https://kornia-tutorials.readthedocs.io/en/latest/
@@ -72,10 +77,12 @@ def rgb_to_hsv(image: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
 def hsv_to_rgb(image: torch.Tensor) -> torch.Tensor:
     """Convert an image from HSV to RGB.
 
-    The H channel values are assumed to be in the range 0..2pi. S and V are in the range 0..1.
+    The H channel values are assumed to be in the range
+    0..2pi. S and V are in the range 0..1.
 
     Args:
-        image: HSV Image to be converted to HSV with shape of :math:`(*, 3, H, W)`.
+        image: HSV Image to be converted to HSV with shape
+            of :math:`(*, 3, H, W)`.
 
     Returns:
         RGB version of the image with shape of :math:`(*, 3, H, W)`.
@@ -263,9 +270,12 @@ class RandomGlobalContrast(MyColorAugmentation):
 
 
 class RandomGaussianColorJitter(MyColorAugmentation):
-    """Add small random noise to each RGB pixel to obtain invariance against some camera distortions.
+    """Add small random noise to each RGB pixel.
 
-    This augmentation is proposed in: http://www.robesafe.es/personal/eduardo.romera/pdfs/Romera18iv.pdf
+    Obtain invariance against some camera distortions.
+
+    This augmentation is proposed in:
+    http://www.robesafe.es/personal/eduardo.romera/pdfs/Romera18iv.pdf
     """
 
     def __init__(self, mean: float = 0.0, std: float = 0.0, prob: float = 0.5):
@@ -295,8 +305,9 @@ class AugMixAugmentator(MyColorAugmentation):
 
     Note:
     Technically, this operation may also include some geometric transformation.
-    However, we find it convenient to put this augmentation method here since the
-    operations involved do not change the image dimensions - accordingly, we do
+    However, we find it convenient to put this augmentation
+    method here since the operations involved do not change
+    the image dimensions - accordingly, we do
     not need to transform the annotations in the same way (i.e. the semantic
     information is preserved).
     """
@@ -310,7 +321,9 @@ class AugMixAugmentator(MyColorAugmentation):
         self.mixture_width: int = (
             3  # Number of augmentation chains to mix per augmented example
         )
-        self.mixture_depth: int = -1  # Depth of augmentation chains. -1 denotes stochastic depth in [1, 3]
+        # Depth of augmentation chains.
+        # -1 denotes stochastic depth in [1, 3]
+        self.mixture_depth: int = -1
         self.aug_severity: int = 1  # Severity of base augmentation operators
 
         self.tensor_to_pil = transforms.ToPILImage()
@@ -321,7 +334,8 @@ class AugMixAugmentator(MyColorAugmentation):
 
         Args:
           image: PIL.Image input image
-          preprocess: Preprocessing function which should return a torch tensor.
+          preprocess: Preprocessing function which should
+            return a torch tensor.
 
         Returns:
           mixed: Augmented and mixed image.

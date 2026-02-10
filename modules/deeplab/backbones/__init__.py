@@ -1,1 +1,1 @@
-from . import resnet
+from . import resnet as resnet

@@ -57,7 +57,11 @@ class GlobalImageNormalizer(ImageNormalizer):
 
 
 class SingleImageNormalizer(ImageNormalizer):
-    """Normalize an image by its mean and std such that it has zero mean and a standard deviation of 1."""
+    """Normalize an image by its mean and std.
+
+    The result has zero mean and a standard deviation
+    of 1.
+    """
 
     def __init__(self):
         pass

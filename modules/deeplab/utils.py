@@ -79,27 +79,33 @@ class IntermediateLayerGetter(nn.ModuleDict):
     def forward(self, x):
         out = OrderedDict()
         for name, module in self.named_children():
-            if self.hrnet_flag and name.startswith(
-                "transition"
-            ):  # if using hrnet, you need to take care of transition
-                if (
-                    name == "transition1"
-                ):  # in transition1, you need to split the module to two streams first
+            # if using hrnet, you need to take
+            # care of transition
+            if self.hrnet_flag and name.startswith("transition"):
+                if name == "transition1":
+                    # in transition1, split the module
+                    # to two streams first
                     x = [trans(x) for trans in module]
-                else:  # all other transition is just an extra one stream split
+                else:
+                    # all other transition is just an
+                    # extra one stream split
                     x.append(module(x[-1]))
-            else:  # other models (ex:resnet,mobilenet) are convolutions in series.
+            else:
+                # other models (ex:resnet,mobilenet)
+                # are convolutions in series.
                 x = module(x)
 
             if name in self.return_layers:
                 out_name = self.return_layers[name]
-                if (
-                    name == "stage4" and self.hrnet_flag
-                ):  # In HRNetV2, we upsample and concat all outputs streams together
+                if name == "stage4" and self.hrnet_flag:
+                    # In HRNetV2, we upsample and concat
+                    # all outputs streams together
                     output_h, output_w = (
                         x[0].size(2),
                         x[0].size(3),
-                    )  # Upsample to size of highest resolution stream
+                    )
+                    # Upsample to size of highest
+                    # resolution stream
                     x1 = F.interpolate(
                         x[1],
                         size=(output_h, output_w),

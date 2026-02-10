@@ -272,20 +272,20 @@ class SegmentationDataset(Dataset):
             "fname": self.filenames_predict[idx],
         }
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, index: int):
         if self.mode == "train":
-            return self.get_train_item(idx)
+            return self.get_train_item(index)
 
         if self.mode == "val":
             return self._get_eval_item(
-                idx,
+                index,
                 self.path_to_val_images,
                 self.path_to_val_annos,
                 self.filenames_val,
             )
 
         if self.mode == "predict":
-            return self._get_predict_item(idx)
+            return self._get_predict_item(index)
 
     def __len__(self):
         if self.mode == "train":

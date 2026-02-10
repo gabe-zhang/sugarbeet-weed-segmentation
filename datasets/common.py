@@ -65,7 +65,8 @@ def get_images_in_dir(path_to_dir: str, sort: bool = True) -> List[str]:
 
     Returns:
         List[str]: contain the full path to all images in given directory
-        sort (bool, optional): whether or not to sort the output. Defaults to True.
+        sort (bool, optional): whether or not to sort
+            the output. Defaults to True.
     """
     fpath_images = []
 
@@ -89,7 +90,8 @@ def get_img_fnames_in_dir(path_to_dir: str, sort: bool = True) -> List[str]:
 
     Returns:
         List[str]: filenames of all images in given directory
-        sort (bool, optional): whether or not to sort the output. Defaults to True.
+        sort (bool, optional): whether or not to sort
+            the output. Defaults to True.
     """
     fnames_images = []
 
@@ -115,7 +117,8 @@ def check_split_file(path_to_split_file: str) -> bool:
         path_to_split_file (str): path to split.yaml file
 
     Returns:
-        bool: checks if there is any overlap between the train, val, and test split.
+        bool: checks if there is any overlap between
+            the train, val, and test split.
     """
     assert path_to_split_file.endswith("yaml"), (
         "The split file should be a yaml file."

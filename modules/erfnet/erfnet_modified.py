@@ -202,7 +202,10 @@ class ERFNetModel(nn.Module):
         self.segmentation_head = SegmentationHead(self.num_classes)
 
         if pretrained:
-            # use this argument to load a pretrained model with encoder trained on ImageNet and decoder trained on Cityscapes train set.
+            # use this argument to load a pretrained
+            # model with encoder trained on ImageNet
+            # and decoder trained on Cityscapes
+            # train set.
             remote_url = (
                 "https://uni-bonn.sciebo.de/s/4nPlQuqbHwyOjIi/download"
             )

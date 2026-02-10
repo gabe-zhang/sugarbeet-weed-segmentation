@@ -302,13 +302,9 @@ class CenterCropTransform(GeometricDataAugmentation):
         anno_chans = anno.shape[0]
 
         if self.crop_width > img_width:
-            raise ValueError(
-                "Crop width must not exceed image width"
-            )
+            raise ValueError("Crop width must not exceed image width")
         if self.crop_height > img_height:
-            raise ValueError(
-                "Crop height must not exceed image height"
-            )
+            raise ValueError("Crop height must not exceed image height")
 
         image_cropped = functional.center_crop(
             image, [self.crop_height, self.crop_width]
@@ -680,12 +676,16 @@ class MyPaddingTransform(GeometricDataAugmentation):
             pad_w = self.divisor - (img_width % self.divisor)
 
         padded_img = functional.pad(
-            image, [0, 0, pad_w, pad_h],
-            fill=0, padding_mode="constant",
+            image,
+            [0, 0, pad_w, pad_h],
+            fill=0,
+            padding_mode="constant",
         )
         padded_anno = functional.pad(
-            anno, [0, 0, pad_w, pad_h],
-            fill=0, padding_mode="constant",
+            anno,
+            [0, 0, pad_w, pad_h],
+            fill=0,
+            padding_mode="constant",
         )
 
         return padded_img, padded_anno

@@ -8,18 +8,21 @@ __all__ = ["DeepLabV3"]
 
 
 class DeepLabV3(_SimpleSegmentationModel):
-    """
-    Implements DeepLabV3 model from
-    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
-    <https://arxiv.org/abs/1706.05587>`_.
+    """Implements DeepLabV3 model from
+    `"Rethinking Atrous Convolution for Semantic Image
+    Segmentation" <https://arxiv.org/abs/1706.05587>`_.
+
     Arguments:
-        backbone (nn.Module): the network used to compute the features for the model.
-            The backbone should return an OrderedDict[Tensor], with the key being
-            "out" for the last feature map used, and "aux" if an auxiliary classifier
-            is used.
-        classifier (nn.Module): module that takes the "out" element returned from
-            the backbone and returns a dense prediction.
-        aux_classifier (nn.Module, optional): auxiliary classifier used during training
+        backbone (nn.Module): the network used to compute
+            the features for the model. The backbone should
+            return an OrderedDict[Tensor], with the key being
+            "out" for the last feature map used, and "aux" if
+            an auxiliary classifier is used.
+        classifier (nn.Module): module that takes the "out"
+            element returned from the backbone and returns a
+            dense prediction.
+        aux_classifier (nn.Module, optional): auxiliary
+            classifier used during training
     """
 
     pass

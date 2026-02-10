@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
-# --------------------------------------- CROSS ENTROPY ---------------------------------------
+# --------------- CROSS ENTROPY ---------------
 
 
 class CrossEntropy(nn.Module):
@@ -27,10 +27,17 @@ class CrossEntropy(nn.Module):
         """Compute cross entropy loss.
 
         Args:
-            inputs (torch.Tensor): Unnormalized input tensor (logits) of shape [B x C x H x W]
-            target (torch.Tensor): Ground-truth target tensor of shape [B x H x W]
+            inputs (torch.Tensor): Unnormalized input
+                tensor (logits) of shape
+                [B x C x H x W]
+            target (torch.Tensor): Ground-truth target
+                tensor of shape [B x H x W]
             mode (str): train, val, or test
-            mask_keep (Optional[torch.Tensor], optional): Mask of pixels of shape [B x H x W] which should be kept during loss computation (1 := keep, 0 := ignore). Defaults to None := keep all.
+            mask_keep (Optional[torch.Tensor], optional):
+                Mask of pixels of shape [B x H x W]
+                which should be kept during loss
+                computation (1 := keep, 0 := ignore).
+                Defaults to None := keep all.
 
         Returns:
             torch.Tensor: loss value (scalar)
@@ -38,7 +45,7 @@ class CrossEntropy(nn.Module):
         assert mode in ["train", "val", "test"]
 
         if mask_keep is not None:
-            target[mask_keep == False] = 0
+            target[~mask_keep] = 0
 
         # get the number of classes and device
         batch_size, num_classes, height, width = inputs.shape
@@ -55,7 +62,8 @@ class CrossEntropy(nn.Module):
         target_one_hot = target_one_hot.bool()
         del target
 
-        # prepare to ignore certain pixels which should not be considered during loss computation
+        # prepare to ignore certain pixels which should
+        # not be considered during loss computation
         if mask_keep is None:
             # consider all pixels to compute the loss
             mask_keep = torch.ones(
@@ -72,53 +80,86 @@ class CrossEntropy(nn.Module):
 
         # if mode == 'train':
         #   for i in range(batch_size):
-        #     # randomly mask soil annotations s.t. they are not considered in the loss
+        #     # randomly mask soil annotations
+        #     # s.t. not considered in the loss
         #     soil_mask = target_one_hot[i,0,:,:]
         #     n_soil_pixel = float(torch.sum(soil_mask))
-        #     n_soil_pixel_to_remove = int(0.95 * n_soil_pixel) # <- remove 95% of all soil annotations
+        #     n_soil_pixel_to_remove = int(
+        #         0.95 * n_soil_pixel
+        #     )  # <- remove 95% of all soil annotations
 
-        #     row_idx, col_idx = list(torch.where(soil_mask == 1))
+        #     row_idx, col_idx = list(
+        #         torch.where(soil_mask == 1)
+        #     )
         #     assert len(row_idx) == n_soil_pixel
-        #     rand_perm = torch.randperm(len(row_idx))[:n_soil_pixel_to_remove]
+        #     rand_perm = torch.randperm(
+        #         len(row_idx)
+        #     )[:n_soil_pixel_to_remove]
 
         #     row_idx = row_idx[rand_perm]
         #     col_idx = col_idx[rand_perm]
-        #     soil_mask[(row_idx, col_idx)] = 0 # <- set these soil annotations to ignore
-        #     assert torch.sum(soil_mask) != n_soil_pixel
+        #     soil_mask[(row_idx, col_idx)] = 0
+        #     # <- set soil annotations to ignore
+        #     assert (
+        #         torch.sum(soil_mask) != n_soil_pixel
+        #     )
 
-        #     # randomly mask crop annotations s.t. they are not considered in the loss
+        #     # randomly mask crop annotations
+        #     # s.t. not considered in the loss
         #     crop_mask = target_one_hot[i,1,:,:]
         #     n_crop_pixel = float(torch.sum(crop_mask))
-        #     n_crop_pixel_to_remove = int(0.25 * n_crop_pixel) # <- remove 30% of all crop annotations
+        #     n_crop_pixel_to_remove = int(
+        #         0.25 * n_crop_pixel
+        #     )  # <- remove 30% of all crop annotations
 
         #     if n_crop_pixel_to_remove > 0:
-        #       row_idx, col_idx = list(torch.where(crop_mask == 1))
+        #       row_idx, col_idx = list(
+        #           torch.where(crop_mask == 1)
+        #       )
         #       assert len(row_idx) == n_crop_pixel
-        #       rand_perm = torch.randperm(len(row_idx))[:n_crop_pixel_to_remove]
+        #       rand_perm = torch.randperm(
+        #           len(row_idx)
+        #       )[:n_crop_pixel_to_remove]
 
         #       row_idx = row_idx[rand_perm]
         #       col_idx = col_idx[rand_perm]
-        #       crop_mask[(row_idx, col_idx)] = 0 # <- set these crop annotations to ignore
-        #       assert torch.sum(crop_mask) != n_crop_pixel
+        #       crop_mask[(row_idx, col_idx)] = 0
+        #       # <- set crop annotations to ignore
+        #       assert (
+        #           torch.sum(crop_mask)
+        #           != n_crop_pixel
+        #       )
 
-        #     # randomly mask weed annotations s.t. they are not considered in the loss
+        #     # randomly mask weed annotations
+        #     # s.t. not considered in the loss
         #     weed_mask = target_one_hot[i,2,:,:]
         #     n_weed_pixel = float(torch.sum(weed_mask))
-        #     n_weed_pixel_to_remove = int(0.05 * n_weed_pixel) # <- remove 5% of all crop annotations
+        #     n_weed_pixel_to_remove = int(
+        #         0.05 * n_weed_pixel
+        #     )  # <- remove 5% of all crop annotations
         #     if n_weed_pixel_to_remove > 0:
-        #       row_idx, col_idx = list(torch.where(weed_mask == 1))
+        #       row_idx, col_idx = list(
+        #           torch.where(weed_mask == 1)
+        #       )
         #       assert len(row_idx) == n_weed_pixel
-        #       rand_perm = torch.randperm(len(row_idx))[:n_weed_pixel_to_remove]
+        #       rand_perm = torch.randperm(
+        #           len(row_idx)
+        #       )[:n_weed_pixel_to_remove]
 
         #       row_idx = row_idx[rand_perm]
         #       col_idx = col_idx[rand_perm]
-        #       weed_mask[(row_idx, col_idx)] = 0 # <- set these crop annotations to ignore
-        #       assert torch.sum(weed_mask) != n_weed_pixel
+        #       weed_mask[(row_idx, col_idx)] = 0
+        #       # <- set crop annotations to ignore
+        #       assert (
+        #           torch.sum(weed_mask)
+        #           != n_weed_pixel
+        #       )
 
         # gather the predicited probabilities of each ground truth category
         probs_gathered = probs[target_one_hot]  # M = N * (H * W) entries
 
-        # make sure that probs are numerically stable when passed to log function: log(0) -> inf
+        # make sure that probs are numerically stable
+        # when passed to log function: log(0) -> inf
         probs_gathered = torch.clip(probs_gathered, 1e-12, 1.0)
 
         # compute loss
@@ -147,9 +188,11 @@ class CrossEntropy(nn.Module):
         return torch.mean(losses)
 
 
-# --------------------------------------- Generalized-Jensen–Shannon Divergence -------------------------
+# ---------- Generalized-Jensen-Shannon Divergence ----------
 def gjs_div_loss(
-    p1_logits: torch.Tensor, p2_logits: torch.Tensor, p3_logits: torch.Tensor
+    p1_logits: torch.Tensor,
+    p2_logits: torch.Tensor,
+    p3_logits: torch.Tensor,
 ) -> torch.Tensor:
     p1_probs = functional.softmax(p1_logits, dim=1)  # [B x C x H x W]
     p2_probs = functional.softmax(p2_logits, dim=1)
@@ -159,17 +202,26 @@ def gjs_div_loss(
     m_probs = torch.clamp(m_probs, 1e-7, 1.0).log()
 
     loss1 = functional.kl_div(
-        input=m_probs, target=p1_probs, reduction="none", log_target=False
+        input=m_probs,
+        target=p1_probs,
+        reduction="none",
+        log_target=False,
     )  # [B x C x H x W]
     loss1 = torch.sum(loss1, dim=1)  # [B x H x W]
 
     loss2 = functional.kl_div(
-        input=m_probs, target=p2_probs, reduction="none", log_target=False
+        input=m_probs,
+        target=p2_probs,
+        reduction="none",
+        log_target=False,
     )
     loss2 = torch.sum(loss2, dim=1)  # [B x H x W]
 
     loss3 = functional.kl_div(
-        input=m_probs, target=p3_probs, reduction="none", log_target=False
+        input=m_probs,
+        target=p3_probs,
+        reduction="none",
+        log_target=False,
     )
     loss3 = torch.sum(loss3, dim=1)  # [B x H x W]
 
@@ -187,7 +239,8 @@ def gjs_div_loss(
     # p3_probs = functional.softmax(p3_logits, dim=1)
     # p3_probs = torch.clamp(p3_probs, 1e-12, 1)
 
-    # m_probs = (p1_probs + p2_probs + p3_probs) / 3 # be aware of floating-point arithmetic (1/3)
+    # m_probs = (p1_probs + p2_probs + p3_probs) / 3
+    # # be aware of floating-point arithmetic (1/3)
 
     # kl_p1_m = p1_probs * torch.log(p1_probs / m_probs)  # [B, C, H, W]
     # kl_p1_m = torch.sum(kl_p1_m, dim=1)  # [B, H, W]
@@ -199,28 +252,39 @@ def gjs_div_loss(
     # kl_p3_m = torch.sum(kl_p3_m, dim=1)  # [B, H, W]
 
     # gjs = (kl_p1_m + kl_p2_m + kl_p3_m) / 3
-    # gjs[gjs < 0] = 0.0 # we perform this operation to prevent issues due to floating-point rounding erros
+    # gjs[gjs < 0] = 0.0
+    # # prevent issues due to floating-point rounding erros
 
     # loss = torch.mean(gjs)
 
-    # assert loss >= 0, f"Invalid loss for js divergence: {loss}"  # lower bound
-    # assert loss <= math.log(3), f"Invalid loss for gjs divergence: {loss}"  # upper bound
+    # assert loss >= 0, (
+    #     f"Invalid loss for js divergence: {loss}"
+    # )  # lower bound
+    # assert loss <= math.log(3), (
+    #     f"Invalid loss for gjs divergence: {loss}"
+    # )  # upper bound
 
     # return loss
 
 
-# --------------------------------------- Jensen–Shannon Divergence -------------------------
+# ---------- Jensen-Shannon Divergence ----------
 def js_div_loss(
     p_logits: torch.Tensor,
     q_logits: torch.Tensor,
     mask_keep: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Compute Jensen–Shannon divergence.
+    """Compute Jensen-Shannon divergence.
 
     Args:
-        p (torch.Tensor): 1st distributions of shape [B x C x H x W]
-        q (torch.Tensor): 2nd distributions of shape [B x C x H x W]
-        mask_keep (Optional[torch.Tensor], optional): Mask of pixels of shape [B x H x W] which should be kept during loss computation (1 := keep, 0 := ignore). Defaults to None.
+        p (torch.Tensor): 1st distributions of shape
+            [B x C x H x W]
+        q (torch.Tensor): 2nd distributions of shape
+            [B x C x H x W]
+        mask_keep (Optional[torch.Tensor], optional):
+            Mask of pixels of shape [B x H x W]
+            which should be kept during loss
+            computation (1 := keep, 0 := ignore).
+            Defaults to None.
 
     Returns:
         torch.Tensor: loss value
@@ -243,9 +307,9 @@ def js_div_loss(
     js_p_q = (0.5 * kl_p_m) + (0.5 * kl_q_m)  # [B, H, W]
 
     if mask_keep is not None:
-        js_p_q = js_p_q[
-            mask_keep
-        ]  # [M] where M is number of pixel which should be kept according to mask_keep (i.e. torch.sum(mask_keep) = M)
+        # [M] where M is number of pixels to keep
+        # per mask_keep (torch.sum(mask_keep) = M)
+        js_p_q = js_p_q[mask_keep]
 
     loss = torch.mean(js_p_q)
 
@@ -257,7 +321,7 @@ def js_div_loss(
     return loss
 
 
-# --------------------------------------- Kullback–Leibler Divergence -------------------------
+# ---------- Kullback-Leibler Divergence ----------
 
 
 def kl_div_loss(
@@ -267,13 +331,24 @@ def kl_div_loss(
 ) -> torch.Tensor:
     """Compute KL-Divergence.
 
-    There are different ways to compute the Kullback-Leibler Divergence.
-    We refer to https://machinelearningmastery.com/divergence-between-probability-distributions/ for more information.
+    There are different ways to compute the
+    Kullback-Leibler Divergence. We refer to
+    https://machinelearningmastery.com/
+    divergence-between-probability-distributions/
+    for more information.
 
     Args:
-        x_logits_pred (torch.Tensor): Source distributions of shape [B x C x H x W]
-        x_logits_true (torch.Tensor): Target distributions of shape [B x C x H x W]
-        mask_keep (Optional[torch.Tensor], optional): Mask of pixels of shape [B x H x W] which should be kept during loss computation (1 := keep, 0 := ignore). Defaults to None.
+        x_logits_pred (torch.Tensor): Source
+            distributions of shape
+            [B x C x H x W]
+        x_logits_true (torch.Tensor): Target
+            distributions of shape
+            [B x C x H x W]
+        mask_keep (Optional[torch.Tensor], optional):
+            Mask of pixels of shape [B x H x W]
+            which should be kept during loss
+            computation (1 := keep, 0 := ignore).
+            Defaults to None.
 
     Returns:
         torch.Tensor: loss value
@@ -288,9 +363,9 @@ def kl_div_loss(
     loss = torch.sum(loss, dim=1)  # [B, H, W]
 
     if mask_keep is not None:
-        loss = loss[
-            mask_keep
-        ]  # [M] where M is number of pixel which should be kept according to mask_keep (i.e. torch.sum(mask_keep) = M)
+        # [M] where M is number of pixels to keep
+        # per mask_keep (torch.sum(mask_keep) = M)
+        loss = loss[mask_keep]
 
     loss = torch.mean(loss)
 
@@ -299,16 +374,22 @@ def kl_div_loss(
     return loss
 
 
-# --------------------------------------- UTILS -----------------------------------------------
+# -------------------- UTILS --------------------
 def get_div_loss_weight(current_epoch: int, max_epochs: int) -> float:
-    """We increase the weight of the divergence losses linearly with increasig number of epochs.
+    """Increase divergence loss weight linearly.
 
-    Note, that the weight is alway in [0.0, 1.0].
-    We increase the weight until a predefined number of epochs is reached and set it to 1.0 afterwards.
+    We increase the weight of the divergence losses
+    linearly with increasing number of epochs.
+
+    Note, that the weight is always in [0.0, 1.0].
+    We increase the weight until a predefined number
+    of epochs is reached and set it to 1.0 afterwards.
 
     Args:
         current_epoch (int): current epoch
-        max_epochs (int): increase the weight linearly until max_epochs is reached - afterwards we set the weight to 1.0
+        max_epochs (int): increase the weight
+            linearly until max_epochs is reached,
+            afterwards set to 1.0
 
     Returns:
         float: value in [0.0, 1.0]
@@ -415,9 +496,7 @@ class DiceLoss(nn.Module):
 
         probs = functional.softmax(inputs, dim=1)
 
-        target_oh = to_one_hot(
-            target, num_classes
-        ).float()
+        target_oh = to_one_hot(target, num_classes).float()
 
         if mask_keep is None:
             mask = torch.ones(
@@ -432,16 +511,9 @@ class DiceLoss(nn.Module):
         probs = probs * mask
 
         # per-class Dice: 2*|P*G| / (|P|+|G|+eps)
-        intersection = torch.sum(
-            probs * target_oh, dim=(0, 2, 3)
-        )
-        cardinality = torch.sum(
-            probs + target_oh, dim=(0, 2, 3)
-        )
-        dice = (
-            (2.0 * intersection + self.eps)
-            / (cardinality + self.eps)
-        )
+        intersection = torch.sum(probs * target_oh, dim=(0, 2, 3))
+        cardinality = torch.sum(probs + target_oh, dim=(0, 2, 3))
+        dice = (2.0 * intersection + self.eps) / (cardinality + self.eps)
 
         if self.weights is not None:
             if device != self.weights.device:
@@ -479,13 +551,8 @@ class DiceCELoss(nn.Module):
     ) -> torch.Tensor:
         """Combined Dice + CrossEntropy loss."""
         ce_loss = self.ce(inputs, target, mode, mask_keep)
-        dice_loss = self.dice(
-            inputs, target, mode, mask_keep
-        )
-        return (
-            self.ce_weight * ce_loss
-            + self.dice_weight * dice_loss
-        )
+        dice_loss = self.dice(inputs, target, mode, mask_keep)
+        return self.ce_weight * ce_loss + self.dice_weight * dice_loss
 
 
 # -------------------- FOCAL LOSS --------------------
