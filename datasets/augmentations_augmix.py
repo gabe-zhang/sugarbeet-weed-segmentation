@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==============================================================================
+# =============================================================
 """Base augmentations operators."""
 
 import numpy as np
@@ -67,7 +67,7 @@ def rotate(pil_img, level):
     degrees = int_parameter(sample_level(level), 30)
     if np.random.uniform() > 0.5:
         degrees = -degrees
-    return pil_img.rotate(degrees, resample=Image.BILINEAR)
+    return pil_img.rotate(degrees, resample=Image.Resampling.BILINEAR)
 
 
 def solarize(pil_img, level):
@@ -81,9 +81,9 @@ def shear_x(pil_img, level):
         level = -level
     return pil_img.transform(
         (pil_img.size[0], pil_img.size[1]),
-        Image.AFFINE,
+        Image.Transform.AFFINE,
         (1, level, 0, 0, 1, 0),
-        resample=Image.BILINEAR,
+        resample=Image.Resampling.BILINEAR,
     )
 
 
@@ -93,9 +93,9 @@ def shear_y(pil_img, level):
         level = -level
     return pil_img.transform(
         (pil_img.size[0], pil_img.size[1]),
-        Image.AFFINE,
+        Image.Transform.AFFINE,
         (1, 0, 0, level, 1, 0),
-        resample=Image.BILINEAR,
+        resample=Image.Resampling.BILINEAR,
     )
 
 
@@ -106,9 +106,9 @@ def translate_x(pil_img, level):
         level = -level
     return pil_img.transform(
         (pil_img.size[0], pil_img.size[1]),
-        Image.AFFINE,
+        Image.Transform.AFFINE,
         (1, 0, level, 0, 1, 0),
-        resample=Image.BILINEAR,
+        resample=Image.Resampling.BILINEAR,
     )
 
 
@@ -119,9 +119,9 @@ def translate_y(pil_img, level):
         level = -level
     return pil_img.transform(
         (pil_img.size[0], pil_img.size[1]),
-        Image.AFFINE,
+        Image.Transform.AFFINE,
         (1, 0, 0, 0, 1, level),
-        resample=Image.BILINEAR,
+        resample=Image.Resampling.BILINEAR,
     )
 
 
