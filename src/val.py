@@ -81,17 +81,22 @@ def main():
     )
     config_callback = ConfigCallback(cfg)
 
+    # Setup run directory: runs/<experiment_id>/
+    run_dir = os.path.join(
+        args["export_dir"], cfg["experiment"]["id"]
+    )
+
     # Setup logger
     wandb_logger = WandbLogger(
         project="sugarbeet-weed-segmentation",
         name=cfg["experiment"]["id"] + "-val",
         config=cfg,
-        save_dir=args["export_dir"],
+        save_dir=run_dir,
     )
 
     # Setup trainer
     trainer = Trainer(
-        default_root_dir=args["export_dir"],
+        default_root_dir=run_dir,
         accelerator="gpu",
         devices=cfg["val"]["n_gpus"],
         logger=wandb_logger,

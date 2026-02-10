@@ -1,7 +1,6 @@
 """Predict with semantic segmentation model."""
 
 import argparse
-import glob
 import os
 import sys
 from typing import Dict
@@ -80,13 +79,9 @@ def main():
         cfg["train"]["postprocess_train_every_x_epochs"],
     )
 
-    # Build versioned run directory: {export_dir}/{dataset_name}_{nn}
-    dataset_name = os.path.basename(cfg["data"]["path_to_dataset"])
-    existing = glob.glob(os.path.join(args["export_dir"], f"{dataset_name}_*"))
-    run_num = len(existing) + 1
+    # Setup run directory: runs/<experiment_id>/
     run_dir = os.path.join(
-        args["export_dir"],
-        f"{dataset_name}_{run_num:02d}",
+        args["export_dir"], cfg["experiment"]["id"]
     )
 
     # Setup trainer

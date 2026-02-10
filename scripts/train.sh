@@ -1,6 +1,7 @@
 #!/bin/bash
 
 uv run src/train.py \
-    --config config/erfnet_finetune_phenobench.yaml \
+    --config config/config_erfnet.yaml \
     --ckpt_path models/semantic-seg-erfnet.ckpt \
-    --export_dir runs
+    --export_dir runs \
+    --resume false
