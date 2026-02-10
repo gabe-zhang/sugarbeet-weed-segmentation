@@ -1,5 +1,7 @@
 # Sugarbeet Weed Segmentation
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%3E%3D3.12-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.6.0-orange.svg)](https://pytorch.org/) [![Lightning](https://img.shields.io/badge/Lightning-2.6.1-blueviolet.svg)](https://lightning.ai/) [![W&B](https://img.shields.io/badge/W%26B-sugarbeet--weed--segmentation-ff69b4?logo=wandb&logoColor=white)](https://wandb.ai/yuanzzhang/sugarbeet-weed-segmentation)
+
 A semantic segmentation framework for agricultural weed detection in **sugarbeet** fields, classifying pixels into three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
 
 > **Note**: Models are trained specifically on sugarbeet imagery from the PhenoBench dataset and are not designed for other crop types.
