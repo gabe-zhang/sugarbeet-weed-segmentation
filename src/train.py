@@ -21,6 +21,8 @@ import torch
 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
     torch.set_float32_matmul_precision("high")
 
+import traceback
+
 import lightning.pytorch as pl
 import oyaml as yaml
 from lightning.pytorch import Trainer
@@ -275,27 +277,39 @@ def main():
         ],
     )
 
-    if args["ckpt_path"] is None:
-        print("Train from scratch.")
-        trainer.fit(seg_module, datasetmodule)
-    elif args["ckpt_path"] is not None and not args["resume"]:
-        print(
-            "Load pretrained model weights but "
-            "other params (e.g. learning rate) "
-            "start from scratch."
+    try:
+        if args["ckpt_path"] is None:
+            print("Train from scratch.")
+            trainer.fit(seg_module, datasetmodule)
+        elif args["ckpt_path"] is not None and not args["resume"]:
+            print(
+                "Load pretrained model weights but "
+                "other params (e.g. learning rate) "
+                "start from scratch."
+            )
+            trainer.fit(seg_module, datasetmodule)
+        elif args["ckpt_path"] is not None and args["resume"]:
+            print("Load pretrained model weights and resume training.")
+            trainer.fit(
+                seg_module,
+                datasetmodule,
+                ckpt_path=args["ckpt_path"],
+            )
+        else:
+            raise RuntimeError(
+                "Can't train any model since the settings are invalid."
+            )
+    except Exception:
+        wandb_logger.experiment.alert(
+            title="Training crashed",
+            text=(
+                f"Experiment: {cfg['experiment']['id']}\n"
+                f"Epoch: {trainer.current_epoch}\n"
+                f"{traceback.format_exc()}"
+            ),
+            level="ERROR",
         )
-        trainer.fit(seg_module, datasetmodule)
-    elif args["ckpt_path"] is not None and args["resume"]:
-        print("Load pretrained model weights and resume training.")
-        trainer.fit(
-            seg_module,
-            datasetmodule,
-            ckpt_path=args["ckpt_path"],
-        )
-    else:
-        raise RuntimeError(
-            "Can't train any model since the settings are invalid."
-        )
+        raise
 
     # Log training completion status
     best_score = checkpoint_best_val_mIoU.best_model_score
@@ -308,7 +322,8 @@ def main():
     if early_stopping.stopped_epoch > 0:
         print(
             f"\nTraining stopped early by EarlyStopping "
-            f"callback at epoch {early_stopping.stopped_epoch}"
+            f"callback at epoch "
+            f"{early_stopping.stopped_epoch}"
         )
     else:
         print(
