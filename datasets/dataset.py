@@ -1,7 +1,7 @@
-"""PhenoBench dataset for sugar beet vs weed segmentation.
+"""Semantic segmentation dataset and data module.
 
 Provides a PyTorch Dataset and Lightning DataModule for loading
-PhenoBench images and semantic annotations (soil / crop / weed).
+images and semantic annotations (soil / crop / weed).
 """
 
 import os
@@ -26,17 +26,10 @@ from datasets.augmentations_geometry import (
 from datasets.image_normalizer import ImageNormalizer, get_image_normalizer
 
 
-class PhenoBench(Dataset):
-    """PhenoBench semantic segmentation dataset.
+class SegmentationDataset(Dataset):
+    """SegmentationDataset semantic segmentation dataset.
 
     The directory structure is as following:
-    ├── test
-    │   ├── images
-    │   ├── leaf_instances
-    │   ├── leaf_visibility
-    │   ├── plant_instances
-    │   ├── plant_visibility
-    │   └── semantics
     ├── train
     │   ├── images
     │   ├── leaf_instances
@@ -44,14 +37,16 @@ class PhenoBench(Dataset):
     │   ├── plant_instances
     │   ├── plant_visibility
     │   └── semantics
-    └── val
-        ├── images
-        ├── leaf_instances
-        ├── leaf_visibility
-        ├── plant_instances
-        ├── plant_visibility
-        ├── semantics
-        └── visualize
+    ├── val
+    │   ├── images
+    │   ├── leaf_instances
+    │   ├── leaf_visibility
+    │   ├── plant_instances
+    │   ├── plant_visibility
+    │   ├── semantics
+    │   └── visualize
+    └── predict
+        └── images
     """
 
     def __init__(
@@ -90,34 +85,37 @@ class PhenoBench(Dataset):
         self.copy_paste = copy_paste
 
         # ------------- Prepare Training -------------
-        self.path_to_train_images = os.path.join(
-            path_to_dataset, "train", "images"
-        )
-        self.path_to_train_annos = os.path.join(
-            path_to_dataset, "train", "semantics"
-        )
-        self.filenames_train = common.get_img_fnames_in_dir(
-            self.path_to_train_images
-        )
+        if self.mode == "train":
+            self.path_to_train_images = os.path.join(
+                path_to_dataset, "train", "images"
+            )
+            self.path_to_train_annos = os.path.join(
+                path_to_dataset, "train", "semantics"
+            )
+            self.filenames_train = common.get_img_fnames_in_dir(
+                self.path_to_train_images
+            )
 
-        # ------------- Prepare Training -------------
-        self.path_to_val_images = os.path.join(
-            path_to_dataset, "val", "images"
-        )
-        self.path_to_val_annos = os.path.join(
-            path_to_dataset, "val", "semantics"
-        )
-        self.filenames_val = common.get_img_fnames_in_dir(
-            self.path_to_val_images
-        )
+        # ------------- Prepare Validation -------------
+        if self.mode in ("train", "val"):
+            self.path_to_val_images = os.path.join(
+                path_to_dataset, "val", "images"
+            )
+            self.path_to_val_annos = os.path.join(
+                path_to_dataset, "val", "semantics"
+            )
+            self.filenames_val = common.get_img_fnames_in_dir(
+                self.path_to_val_images
+            )
 
         # ------------- Prepare Prediction -------------
-        self.path_to_predict_images = os.path.join(
-            path_to_dataset, "test", "images"
-        )
-        self.filenames_predict = common.get_img_fnames_in_dir(
-            self.path_to_predict_images
-        )
+        if self.mode == "predict":
+            self.path_to_predict_images = os.path.join(
+                path_to_dataset, "predict", "images"
+            )
+            self.filenames_predict = common.get_img_fnames_in_dir(
+                self.path_to_predict_images
+            )
 
         # specify image transformations
         self.img_to_tensor = transforms.ToTensor()
@@ -300,8 +298,8 @@ class PhenoBench(Dataset):
             return len(self.filenames_predict)
 
 
-class PhenoBenchModule(pl.LightningDataModule):
-    """Lightning DataModule for the PhenoBench dataset."""
+class SegmentationDataModule(pl.LightningDataModule):
+    """Lightning DataModule for semantic segmentation."""
 
     def __init__(self, cfg: Dict):
         super().__init__()
@@ -328,7 +326,7 @@ class PhenoBenchModule(pl.LightningDataModule):
                 self.cfg, "train"
             )
             train_copy_paste = get_copy_paste_augmentation(self.cfg, "train")
-            self.train_ds = PhenoBench(
+            self.train_ds = SegmentationDataset(
                 path_to_dataset,
                 mode="train",
                 img_normalizer=image_normalizer,
@@ -341,7 +339,7 @@ class PhenoBenchModule(pl.LightningDataModule):
             val_augmentations_geometric = get_geometric_augmentations(
                 self.cfg, "val"
             )
-            self.val_ds = PhenoBench(
+            self.val_ds = SegmentationDataset(
                 path_to_dataset,
                 mode="val",
                 img_normalizer=image_normalizer,
@@ -354,7 +352,7 @@ class PhenoBenchModule(pl.LightningDataModule):
             predict_augs_geometric = get_geometric_augmentations(
                 self.cfg, "predict"
             )
-            self.predict_ds = PhenoBench(
+            self.predict_ds = SegmentationDataset(
                 path_to_dataset,
                 mode="predict",
                 img_normalizer=image_normalizer,
