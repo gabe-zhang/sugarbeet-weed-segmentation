@@ -48,7 +48,7 @@ Update `data.path_to_dataset` in the YAML config files under `config/`.
 
 ```
 sugarbeet-weed-segmentation/
-├── src/              # Entry points (train, test, val, predict)
+├── src/              # Entry points (train, val, predict)
 ├── config/           # YAML experiment configs
 ├── models/           # Pretrained checkpoints
 ├── runs/             # Training outputs and logs

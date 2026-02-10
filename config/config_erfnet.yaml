@@ -62,7 +62,7 @@ val:
     center_crop:
       height: 1024
       width: 1024
-test:
+predict:
   step_settings:
     - regular
   n_gpus: 1

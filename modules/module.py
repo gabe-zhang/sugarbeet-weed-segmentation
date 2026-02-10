@@ -18,7 +18,6 @@ class SegmentationNetwork(pl.LightningModule):
         weight_decay: float,
         train_step_settings: Optional[List[str]] = None,
         val_step_settings: Optional[List[str]] = None,
-        test_step_settings: Optional[List[str]] = None,
         predict_step_settings: Optional[List[str]] = None,
         ckpt_path=None,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
@@ -46,11 +45,6 @@ class SegmentationNetwork(pl.LightningModule):
             num_classes=self.network.num_classes,
             average="none",
         )
-        self.metric_test_iou = torchmetrics.JaccardIndex(
-            task="multiclass",
-            num_classes=self.network.num_classes,
-            average="none",
-        )
 
         if train_step_settings is not None:
             self.train_step_settings = train_step_settings
@@ -61,11 +55,6 @@ class SegmentationNetwork(pl.LightningModule):
             self.val_step_settings = val_step_settings
         else:
             self.val_step_settings = []
-
-        if test_step_settings is not None:
-            self.test_step_settings = test_step_settings
-        else:
-            self.test_step_settings = []
 
         if predict_step_settings is not None:
             self.predict_step_settings = predict_step_settings
@@ -263,43 +252,6 @@ class SegmentationNetwork(pl.LightningModule):
         path_to_classwise_iou_dir = os.path.join(
             self.trainer.log_dir,
             "val",
-            f"epoch-{epoch:06d}",
-        )
-        save_iou_metric(iou_per_class, path_to_classwise_iou_dir)
-
-    def test_step(self, batch: dict, batch_idx: int) -> Dict[str, Any]:
-        if not self.test_step_settings:
-            raise ValueError(
-                "You need to specify the settings for the test step."
-            )
-        assert len(self.test_step_settings) == 1
-
-        # predictions
-        if "regular" in self.test_step_settings:
-            logits = self.forward(batch["input_image"])
-
-        pred_cls = torch.argmax(logits, dim=1)
-
-        # regular evaluation for all classes
-        self.metric_test_iou(pred_cls, batch["anno"])
-
-        return {
-            "logits": logits,
-            "anno": batch["anno"],
-        }
-
-    def on_test_epoch_end(self) -> None:
-        # compute final metrics over all batches
-        iou_per_class = self.metric_test_iou.compute()
-        mIoU = round(float(iou_per_class.mean().cpu()), 3)
-        print(f"Test mIoU: {mIoU}")
-        self.metric_test_iou.reset()
-
-        epoch = self.trainer.current_epoch
-
-        path_to_classwise_iou_dir = os.path.join(
-            self.trainer.log_dir,
-            "test",
             f"epoch-{epoch:06d}",
         )
         save_iou_metric(iou_per_class, path_to_classwise_iou_dir)

@@ -1,3 +1,9 @@
+"""PhenoBench dataset for sugar beet vs weed segmentation.
+
+Provides a PyTorch Dataset and Lightning DataModule for loading
+PhenoBench images and semantic annotations (soil / crop / weed).
+"""
+
 import os
 import random
 from typing import Callable, Dict, List, Optional, Tuple
@@ -20,8 +26,8 @@ from datasets.augmentations_geometry import (
 from datasets.image_normalizer import ImageNormalizer, get_image_normalizer
 
 
-class PDC(Dataset):
-    """Represents the PDC dataset.
+class PhenoBench(Dataset):
+    """PhenoBench semantic segmentation dataset.
 
     The directory structure is as following:
     ├── test
@@ -60,11 +66,13 @@ class PDC(Dataset):
         """Get the path to all images and its corresponding annotations.
 
         Args:
-            path_to_dataset (str): Path to dir that contains the images and annotations
-            mode(str): train, val, or test
-            img_normalizer (ImageNormalizer): Specifies how to normalize the input images
-            augmentations_geometric (List[GeometricDataAugmentation]): Geometric data augmentations applied to the image and its annotations
-            augmentations_color (List[Callable]): Color data augmentations applied to the image
+            path_to_dataset: Path to dataset directory.
+            mode: train, val, or predict.
+            img_normalizer: Image normalizer.
+            augmentations_geometric: Geometric augmentations
+                applied to image and annotation.
+            augmentations_color: Color augmentations
+                applied to the image.
         """
 
         assert os.path.exists(path_to_dataset), (
@@ -73,7 +81,7 @@ class PDC(Dataset):
 
         super().__init__()
 
-        assert mode in ["train", "val", "test"]
+        assert mode in ["train", "val", "predict"]
         self.mode = mode
 
         self.img_normalizer = img_normalizer
@@ -103,15 +111,12 @@ class PDC(Dataset):
             self.path_to_val_images
         )
 
-        # ------------- Prepare Testing -------------
-        self.path_to_test_images = os.path.join(
+        # ------------- Prepare Prediction -------------
+        self.path_to_predict_images = os.path.join(
             path_to_dataset, "test", "images"
         )
-        self.path_to_test_annos = os.path.join(
-            path_to_dataset, "test", "semantics"
-        )
-        self.filenames_test = common.get_img_fnames_in_dir(
-            self.path_to_test_images
+        self.filenames_predict = common.get_img_fnames_in_dir(
+            self.path_to_predict_images
         )
 
         # specify image transformations
@@ -149,15 +154,9 @@ class PDC(Dataset):
         anno[mask_4] = 2
 
         if self.copy_paste is not None:
-            donor_idx = random.randint(
-                0, len(self.filenames_train) - 1
-            )
-            d_img, d_anno = self._load_augmented(
-                donor_idx
-            )
-            img, anno = self.copy_paste(
-                img, anno, d_img, d_anno
-            )
+            donor_idx = random.randint(0, len(self.filenames_train) - 1)
+            d_img, d_anno = self._load_augmented(donor_idx)
+            img, anno = self.copy_paste(img, anno, d_img, d_anno)
 
         img_before_norm = img.clone()
         img = self.img_normalizer.normalize(img)
@@ -169,9 +168,7 @@ class PDC(Dataset):
             "fname": self.filenames_train[idx],
         }
 
-    def _load_augmented(
-        self, idx: int
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _load_augmented(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Load a training sample with augmentations applied.
 
         Used to obtain a donor image for copy-paste.
@@ -212,24 +209,28 @@ class PDC(Dataset):
 
         return img, anno
 
-    def get_val_item(self, idx: int) -> Dict:
-        path_to_current_img = os.path.join(
-            self.path_to_val_images, self.filenames_val[idx]
-        )
-        img_pil = Image.open(path_to_current_img)
-        img = self.img_to_tensor(img_pil)  # [C x H x W] with values in [0, 1]
+    def _get_eval_item(
+        self,
+        idx: int,
+        path_to_images: str,
+        path_to_annos: str,
+        filenames: List[str],
+    ) -> Dict:
+        """Load a val sample with preprocessing."""
+        path_img = os.path.join(path_to_images, filenames[idx])
+        img = self.img_to_tensor(Image.open(path_img))
 
-        path_to_current_anno = os.path.join(
-            self.path_to_val_annos, self.filenames_val[idx]
-        )
-        anno = np.array(Image.open(path_to_current_anno))  # dtype: int32
+        path_anno = os.path.join(path_to_annos, filenames[idx])
+        anno = np.array(Image.open(path_anno))
         if len(anno.shape) > 2:
             anno = anno[:, :, 0]
         anno = anno.astype(np.int64)
-        anno = torch.Tensor(anno).type(torch.int64)  # [H x W]
+        anno = torch.Tensor(anno).type(torch.int64)
+        anno = anno.unsqueeze(0)  # [1 x H x W]
 
-        img_before_norm = img.clone()
-        img = self.img_normalizer.normalize(img)
+        for aug in self.augmentations_geometric:
+            img, anno = aug(img, anno)
+        anno = anno.squeeze(0)  # [H x W]
 
         mask_3 = anno == 3
         anno[mask_3] = 1
@@ -237,57 +238,56 @@ class PDC(Dataset):
         mask_4 = anno == 4
         anno[mask_4] = 2
 
+        img_before_norm = img.clone()
+        img = self.img_normalizer.normalize(img)
+
         return {
             "input_image_before_norm": img_before_norm,
             "input_image": img,
             "anno": anno,
-            "fname": self.filenames_val[idx],
+            "fname": filenames[idx],
         }
 
-    def get_test_item(self, idx: int) -> Dict:
-        path_to_current_img = os.path.join(
-            self.path_to_test_images, self.filenames_test[idx]
+    def _get_predict_item(self, idx: int) -> Dict:
+        """Load a predict sample (no annotation)."""
+        path_img = os.path.join(
+            self.path_to_predict_images,
+            self.filenames_predict[idx],
         )
-        img_pil = Image.open(path_to_current_img)
-        img = self.img_to_tensor(img_pil)  # [C x H x W] with values in [0, 1]
+        img = self.img_to_tensor(Image.open(path_img))
 
-        path_to_current_anno = os.path.join(
-            self.path_to_test_annos, self.filenames_test[idx]
+        dummy_anno = torch.zeros(
+            1,
+            img.shape[1],
+            img.shape[2],
+            dtype=torch.int64,
         )
-        anno = np.array(Image.open(path_to_current_anno))  # dtype: int32
-        if len(anno.shape) > 2:
-            anno = anno[:, :, 0]
-        anno = anno.astype(np.int64)
-        anno = torch.Tensor(anno).type(torch.int64)  # [H x W]
+        for aug in self.augmentations_geometric:
+            img, dummy_anno = aug(img, dummy_anno)
 
         img_before_norm = img.clone()
         img = self.img_normalizer.normalize(img)
 
-        mask_3 = anno == 3
-        anno[mask_3] = 1
-
-        mask_4 = anno == 4
-        anno[mask_4] = 2
-
         return {
             "input_image_before_norm": img_before_norm,
             "input_image": img,
-            "anno": anno,
-            "fname": self.filenames_test[idx],
+            "fname": self.filenames_predict[idx],
         }
 
     def __getitem__(self, idx: int):
         if self.mode == "train":
-            items = self.get_train_item(idx)
-            return items
+            return self.get_train_item(idx)
 
         if self.mode == "val":
-            items = self.get_val_item(idx)
-            return items
+            return self._get_eval_item(
+                idx,
+                self.path_to_val_images,
+                self.path_to_val_annos,
+                self.filenames_val,
+            )
 
-        if self.mode == "test":
-            items = self.get_test_item(idx)
-            return items
+        if self.mode == "predict":
+            return self._get_predict_item(idx)
 
     def __len__(self):
         if self.mode == "train":
@@ -296,12 +296,12 @@ class PDC(Dataset):
         if self.mode == "val":
             return len(self.filenames_val)
 
-        if self.mode == "test":
-            return len(self.filenames_test)
+        if self.mode == "predict":
+            return len(self.filenames_predict)
 
 
-class PDCModule(pl.LightningDataModule):
-    """Encapsulates all the steps needed to process data from the PDC Challenge."""
+class PhenoBenchModule(pl.LightningDataModule):
+    """Lightning DataModule for the PhenoBench dataset."""
 
     def __init__(self, cfg: Dict):
         super().__init__()
@@ -327,10 +327,8 @@ class PDCModule(pl.LightningDataModule):
             train_augmentations_color = get_color_augmentations(
                 self.cfg, "train"
             )
-            train_copy_paste = get_copy_paste_augmentation(
-                self.cfg, "train"
-            )
-            self.train_ds = PDC(
+            train_copy_paste = get_copy_paste_augmentation(self.cfg, "train")
+            self.train_ds = PhenoBench(
                 path_to_dataset,
                 mode="train",
                 img_normalizer=image_normalizer,
@@ -343,7 +341,7 @@ class PDCModule(pl.LightningDataModule):
             val_augmentations_geometric = get_geometric_augmentations(
                 self.cfg, "val"
             )
-            self.val_ds = PDC(
+            self.val_ds = PhenoBench(
                 path_to_dataset,
                 mode="val",
                 img_normalizer=image_normalizer,
@@ -351,16 +349,16 @@ class PDCModule(pl.LightningDataModule):
                 augmentations_color=[],
             )
 
-        if stage == "test" or stage is None:
-            # ----------- TEST -----------
-            test_augmentations_geometric = get_geometric_augmentations(
-                self.cfg, "test"
+        if stage == "predict" or stage is None:
+            # ----------- PREDICT -----------
+            predict_augs_geometric = get_geometric_augmentations(
+                self.cfg, "predict"
             )
-            self.test_ds = PDC(
+            self.predict_ds = PhenoBench(
                 path_to_dataset,
-                mode="test",
+                mode="predict",
                 img_normalizer=image_normalizer,
-                augmentations_geometric=test_augmentations_geometric,
+                augmentations_geometric=predict_augs_geometric,
                 augmentations_color=[],
             )
 
@@ -396,12 +394,12 @@ class PDCModule(pl.LightningDataModule):
 
         return loader
 
-    def test_dataloader(self) -> DataLoader:
-        batch_size: int = self.cfg["test"]["batch_size"]
+    def predict_dataloader(self) -> DataLoader:
+        batch_size: int = self.cfg["predict"]["batch_size"]
         n_workers: int = self.cfg["data"]["num_workers"]
 
         loader = DataLoader(
-            self.test_ds,
+            self.predict_ds,
             batch_size=batch_size,
             num_workers=n_workers,
             shuffle=False,
