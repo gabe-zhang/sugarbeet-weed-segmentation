@@ -1,0 +1,63 @@
+seed: 0
+experiment:
+  id: yolo26x-baseline
+
+model: yolo26x-seg.yaml
+pretrained_weights: models/yolo26x-seg.pt
+
+data:
+  path: data/PhenoBench_yolo_seg
+  train: images/train
+  val: images/val
+  names:
+    0: sugarbeet
+    1: weed
+
+train:
+  epochs: 200
+  workers: 4
+  batch: 4
+  imgsz: 1024
+  device: "0"
+  patience: 100
+  # Optimizer
+  optimizer: auto
+  lr0: 0.001667
+  lrf: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  # Loss weights
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5
+
+augmentation:
+  # Color
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  # Geometric
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  bgr: 0.0
+  # Mosaic / mix
+  mosaic: 1.0
+  close_mosaic: 10
+  mixup: 0.0
+  cutmix: 0.0
+  copy_paste: 0.0
+  copy_paste_mode: flip
+  # Other
+  auto_augment: randaugment
+  erasing: 0.4
+
+wandb:
+  project: sugarbeet-weed-segmentation

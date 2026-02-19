@@ -13,6 +13,7 @@ dependencies = [
     "torch==2.6.0",
     "torchmetrics>=1.8.2",
     "torchvision==0.21.0",
+    "ultralytics>=8.4.14",
     "wandb>=0.24.2",
     "wget>=3.2",
 ]

@@ -6,11 +6,13 @@ __pycache__/
 data/
 models/
 images/
+*.pt
 
 # Outputs
 runs/
 prediction/
 wandb/
+out.txt
 
 # IDE
 .vscode/
