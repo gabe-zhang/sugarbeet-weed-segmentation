@@ -16,10 +16,6 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 )
 
-import torch
-
-if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
-    torch.set_float32_matmul_precision("high")
 
 import traceback
 
