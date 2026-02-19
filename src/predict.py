@@ -37,6 +37,12 @@ def parse_args() -> Dict[str, str]:
         required=True,
         help="Provide *.ckpt file to continue training.",
     )
+    parser.add_argument(
+        "--data_path",
+        required=False,
+        default=None,
+        help="Override dataset path for prediction.",
+    )
 
     args = vars(parser.parse_args())
 
@@ -55,6 +61,9 @@ def load_config(path_to_config_file: str) -> Dict:
 def main():
     args = parse_args()
     cfg = load_config(args["config"])
+
+    if args["data_path"] is not None:
+        cfg["data"]["path_to_dataset"] = args["data_path"]
 
     datasetmodule = get_data_module(cfg)
     criterion = get_criterion(cfg)
@@ -80,9 +89,7 @@ def main():
     )
 
     # Setup run directory: runs/<experiment_id>/
-    run_dir = os.path.join(
-        args["export_dir"], cfg["experiment"]["id"]
-    )
+    run_dir = os.path.join(args["export_dir"], cfg["experiment"]["id"])
 
     # Setup trainer
     trainer = Trainer(

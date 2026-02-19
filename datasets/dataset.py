@@ -115,9 +115,21 @@ class SegmentationDataset(Dataset):
 
         # ------------- Prepare Prediction -------------
         if self.mode == "predict":
-            self.path_to_predict_images = os.path.join(
+            predict_sub = os.path.join(
                 path_to_dataset, "predict", "images"
             )
+            images_sub = os.path.join(
+                path_to_dataset, "images"
+            )
+            if os.path.isdir(predict_sub):
+                self.path_to_predict_images = predict_sub
+            elif os.path.isdir(images_sub):
+                self.path_to_predict_images = images_sub
+            else:
+                raise FileNotFoundError(
+                    f"No images found at {predict_sub}"
+                    f" or {images_sub}"
+                )
             self.filenames_predict = common.get_img_fnames_in_dir(
                 self.path_to_predict_images
             )
