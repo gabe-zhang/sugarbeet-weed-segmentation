@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import oyaml as yaml
 from lightning.pytorch import Trainer
-from lightning.pytorch.loggers import WandbLogger
 
 from callbacks import (
     ConfigCallback,
@@ -82,24 +81,13 @@ def main():
     config_callback = ConfigCallback(cfg)
 
     # Setup run directory: runs/<experiment_id>/
-    run_dir = os.path.join(
-        args["export_dir"], cfg["experiment"]["id"]
-    )
-
-    # Setup logger
-    wandb_logger = WandbLogger(
-        project="sugarbeet-weed-segmentation",
-        name=cfg["experiment"]["id"] + "-val",
-        config=cfg,
-        save_dir=run_dir,
-    )
+    run_dir = os.path.join(args["export_dir"], cfg["experiment"]["id"])
 
     # Setup trainer
     trainer = Trainer(
         default_root_dir=run_dir,
         accelerator="gpu",
         devices=cfg["val"]["n_gpus"],
-        logger=wandb_logger,
         callbacks=[
             visualizer_callback,
             postprocessor_callback,
