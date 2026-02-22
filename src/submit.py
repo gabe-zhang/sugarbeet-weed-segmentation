@@ -48,8 +48,6 @@ from modules import get_backbone, get_criterion, module
 CLASS_COLORS = np.array([[0, 0, 0], [0, 255, 0], [255, 0, 0]], dtype=np.uint8)
 CLASS_NAMES = ["soil", "crop", "weed"]
 
-TTA_SCALES = [0.75, 1.0, 1.25]
-
 
 class ImageFolderDataset(Dataset):
     """Load images from a directory, no augmentation."""
@@ -118,6 +116,13 @@ def parse_args() -> dict:
         "--tta",
         action="store_true",
         help="Enable test-time augmentation (multi-scale + flip).",
+    )
+    parser.add_argument(
+        "--tta_scales",
+        type=float,
+        nargs="+",
+        default=[0.75, 1.0, 1.25],
+        help="TTA scale factors (default: 0.75 1.0 1.25).",
     )
     parser.add_argument(
         "--opening",
@@ -351,6 +356,7 @@ def _run_inference(
     gt_dir: Path | None,
     num_classes: int,
     use_tta: bool,
+    tta_scales: list[float],
     opening_ks: int,
     erosion_ks: int,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -373,7 +379,7 @@ def _run_inference(
             accum = None
             for seg_module in models:
                 if use_tta:
-                    probs = predict_tta_batch(seg_module, imgs, TTA_SCALES)
+                    probs = predict_tta_batch(seg_module, imgs, tta_scales)
                 else:
                     probs = predict_batch(seg_module, imgs)
                 if accum is None:
@@ -452,13 +458,14 @@ def main() -> None:
     num_classes = cfg["backbone"]["num_classes"]
 
     use_tta = args["tta"]
+    tta_scales = args["tta_scales"]
     opening_ks = args["opening"]
     erosion_ks = args["erosion"]
     flags: list[str] = []
     if len(models) > 1:
         flags.append(f"ensemble x{len(models)}")
     if use_tta:
-        flags.append(f"TTA scales={TTA_SCALES} flip=hv")
+        flags.append(f"TTA scales={tta_scales} flip=hv")
     if opening_ks > 0:
         flags.append(f"opening k={opening_ks}")
     if erosion_ks > 0:
@@ -490,6 +497,7 @@ def main() -> None:
         gt_dir,
         num_classes,
         use_tta,
+        tta_scales,
         opening_ks,
         erosion_ks,
     )
@@ -510,9 +518,10 @@ def main() -> None:
     if args["split"] == "test":
         zip_path = run_dir / f"{cfg['experiment']['id']}_submission.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.mkdir("semantics")
             for fname in sorted(os.listdir(sem_dir)):
                 fpath = sem_dir / fname
-                zf.write(fpath, Path("semantics") / fname)
+                zf.write(fpath, f"semantics/{fname}")
         print(f"\nSubmission zip: {zip_path}")
         print("\nValidate with:")
         print(

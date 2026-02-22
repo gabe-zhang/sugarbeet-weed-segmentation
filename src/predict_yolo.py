@@ -220,9 +220,10 @@ def main() -> None:
     if args["split"] == "test":
         zip_path = run_dir / f"{weights_name}_submission.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.mkdir("semantics")
             for fname in sorted(os.listdir(sem_dir)):
                 fpath = sem_dir / fname
-                zf.write(fpath, Path("semantics") / fname)
+                zf.write(fpath, f"semantics/{fname}")
         print(f"\nSubmission zip: {zip_path}")
 
     print(f"\nPredictions: {sem_dir}")

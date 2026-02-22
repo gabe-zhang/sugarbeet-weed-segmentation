@@ -340,8 +340,9 @@ def main() -> None:
                 (sem_dir, "semantics"),
                 (inst_dir, "plant_instances"),
             ):
+                zf.mkdir(prefix)
                 for f in sorted(os.listdir(d)):
-                    zf.write(d / f, Path(prefix) / f)
+                    zf.write(d / f, f"{prefix}/{f}")
         print(f"\nSubmission zip: {zip_path}")
         print("\nValidate with:")
         print(
