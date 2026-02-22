@@ -6,7 +6,7 @@ model: yolo26x-seg.yaml
 pretrained_weights: models/yolo26x-seg.pt
 
 data:
-  path: data/PhenoBench_yolo_seg
+  path: data/PhenoBench_yolo
   train: images/train
   val: images/val
   names:

@@ -4,14 +4,14 @@ Reads plant_instances + semantics masks and produces per-image
 polygon label files compatible with Ultralytics instance seg.
 
 Output structure:
-    data/PhenoBench_yolo_seg/
+    data/PhenoBench_yolo/
     ├── images/{train,val}/  (symlinks to originals)
     ├── labels/{train,val}/  (txt polygon labels)
     └── data.yaml
 
 Usage:
     uv run tools/convert_phenobench_to_yolo.py \
-        --src data/PhenoBench --dst data/PhenoBench_yolo_seg
+        --src data/PhenoBench --dst data/PhenoBench_yolo
 """
 
 import argparse
@@ -132,7 +132,7 @@ def main() -> None:
     parser.add_argument(
         "--dst",
         type=str,
-        default="data/PhenoBench_yolo_seg",
+        default="data/PhenoBench_yolo",
         help="Output YOLO seg directory.",
     )
     args = parser.parse_args()

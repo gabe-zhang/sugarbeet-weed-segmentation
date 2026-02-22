@@ -5,6 +5,7 @@ Usage:
 """
 
 import argparse
+import os
 import tempfile
 from pathlib import Path
 
@@ -111,18 +112,46 @@ def main() -> None:
 
     project = str(Path(args.export_dir).resolve())
     run_dir = Path(project) / run_name
+    os.environ["WANDB_DIR"] = str(run_dir)
 
     if args.resume:
         last_ckpt = run_dir / "weights" / "last.pt"
         if not last_ckpt.exists():
             raise FileNotFoundError(f"No checkpoint at {last_ckpt}")
+
+        # Resume W&B from previous run
+        wandb_id_file = run_dir / "wandb_run_id.txt"
+        if wandb_id_file.exists():
+            prev_id = wandb_id_file.read_text().strip()
+            wandb.init(
+                project=wandb_project,
+                name=run_name,
+                id=prev_id,
+                resume="must",
+                config=cfg,
+            )
+        else:
+            wandb.init(
+                project=wandb_project,
+                name=run_name,
+                config=cfg,
+            )
+
         model = YOLO(str(last_ckpt))
-        model.add_callback("on_fit_epoch_end", log_per_class_metrics)
-        model.add_callback("on_train_batch_end", log_gradient_stats)
+        model.add_callback(
+            "on_fit_epoch_end", log_per_class_metrics
+        )
+        model.add_callback(
+            "on_train_batch_end", log_gradient_stats
+        )
         model.train(resume=True)
         return
 
     wandb.init(project=wandb_project, name=run_name, config=cfg)
+
+    # Save W&B run ID for resume
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "wandb_run_id.txt").write_text(wandb.run.id)
 
     data_yaml = write_data_yaml(cfg["data"])
     aug_cfg = cfg.get("augmentation", {})
