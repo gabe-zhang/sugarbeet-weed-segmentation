@@ -2,31 +2,26 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%3E%3D3.12-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.6.0-orange.svg)](https://pytorch.org/) [![Lightning](https://img.shields.io/badge/Lightning-2.6.1-blueviolet.svg)](https://lightning.ai/) [![W&B](https://img.shields.io/badge/W%26B-sugarbeet--weed--segmentation-ff69b4?logo=wandb&logoColor=white)](https://wandb.ai/yuanzzhang/sugarbeet-weed-segmentation)
 
-A semantic segmentation framework for agricultural weed detection in **sugarbeet** fields, classifying pixels into three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
+A segmentation framework for agricultural weed detection in **sugarbeet** fields, supporting **semantic**, **instance**, and **panoptic** segmentation across three categories: **soil** (background), **crop** (sugarbeet), and **weed**.
 
-> **Note**: Models are trained specifically on sugarbeet imagery from the PhenoBench dataset and are not designed for other crop types.
+Trained on the [PhenoBench dataset](https://www.phenobench.org/) with CodaLab benchmark submission support.
+
+
+## Models
+
+| Task | Model | Framework |
+|------|-------|-----------|
+| Semantic segmentation | [ERFNet](https://github.com/Eromera/erfnet_pytorch), [DeepLabV3+](https://github.com/VainF/DeepLabV3Plus-Pytorch) | PyTorch Lightning |
+| Instance / Panoptic segmentation | [YOLO26](https://docs.ultralytics.com/) | Ultralytics |
 
 ## Branches
 
-| Branch | Target Platform | Python | Description |
-|--------|-----------------|--------|-------------|
-| `main` | Desktop / Cloud GPU | 3.12+ | Full training and inference with `uv` managed dependencies |
-| `brain` | NVIDIA Jetson Xavier NX | 3.8 | Edge deployment with TensorRT optimization |
-
-### Main Branch
-- Full dependency management via `uv add`
-- Training, validation, and inference scripts
-- Supports [ERFNet](https://github.com/Eromera/erfnet_pytorch) and [DeepLabV3+](https://github.com/VainF/DeepLabV3Plus-Pytorch)
-
-### Brain Branch
-- Dependencies managed via `uv pip install` with `--system-site-packages`
-- TensorRT model conversion (`conversion.ipynb`)
-- Benchmark script for PyTorch vs TensorRT comparison (`benchmark.py`)
-- Optimized for real-time inference on edge devices
+| Branch | Platform | Description |
+|--------|----------|-------------|
+| `main` | Desktop / Cloud GPU | Training, inference, and submission scripts |
+| `brain` | NVIDIA Jetson Xavier NX | TensorRT edge deployment |
 
 ## Setup
-
-### Main Branch (Desktop/Cloud)
 
 ```bash
 git clone https://github.com/gabe-zhang/sugarbeet-weed-segmentation.git
@@ -34,67 +29,49 @@ cd sugarbeet-weed-segmentation
 uv sync
 ```
 
-### Brain Branch (Jetson Xavier NX)
-
-```bash
-# Ensure system packages are available (CUDA, TensorRT, PyTorch)
-uv venv --system-site-packages
-uv pip install -r requirements.txt
-```
-
-### Dataset Configuration
-
-Update `data.path_to_dataset` in the YAML config files under `config/`.
-
-## Project Structure
-
-```
-sugarbeet-weed-segmentation/
-├── src/              # Entry points (train, val, predict)
-├── config/           # YAML experiment configs
-├── models/           # Pretrained checkpoints
-├── runs/             # Training outputs and logs
-├── modules/          # Model architectures and losses
-├── datasets/         # Data loaders and augmentations
-├── callbacks/        # Training callbacks
-├── scripts/          # Shell scripts
-└── tools/            # Utility scripts
-```
+Download [PhenoBench](https://www.phenobench.org/) and update the data path in the YAML config files under `config/`.
 
 ## Usage
 
-Shell scripts under `scripts/` wrap common workflows:
+### Semantic Segmentation (ERFNet / DeepLabV3+)
 
 ```bash
-./scripts/train.sh    # Train a model
-./scripts/val.sh      # Run validation
-./scripts/predict.sh  # Run inference
+# Train
+uv run src/train.py --config config/<config>.yaml --export_dir runs
+
+# Validate / submit
+uv run src/submit.py \
+    --config config/<config>.yaml \
+    --ckpt_path runs/<run>/checkpoints/<best>.ckpt \
+    --export_dir runs --split val --tta
 ```
 
-Script calls `uv run src/<script>.py` with these flags:
+Supports ensemble (`--config`/`--ckpt_path` repeated), TTA (`--tta`, `--tta_scales`), and morphological postprocessing (`--opening`).
 
-| Flag | Description |
-|------|-------------|
-| `--config` | Path to YAML experiment config |
-| `--ckpt_path` | Checkpoint path (auto-downloaded if missing) |
-| `--export_dir` | Output directory for logs and checkpoints |
-| `--resume` | Resume training (auto-detects last checkpoint) |
+### Instance / Panoptic Segmentation (YOLO26)
 
-## Pretrained Models
+```bash
+# Convert PhenoBench to YOLO format
+uv run tools/convert_phenobench_to_yolo.py
 
-Pretrained weights from PRBonn (auto-downloaded when using `--ckpt_path`):
-- [ERFNet](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-erfnet.ckpt) (24 MB)
-- [DeepLabV3+](https://www.ipb.uni-bonn.de/html/projects/phenobench/semantic_segmentation/semantic-seg-deeplab.ckpt) (456 MB)
+# Train
+uv run src/train_yolo.py --config config/yolo26x-baseline.yaml
 
-## Benchmark (Jetson Xavier NX)
+# Predict (instance -> semantic)
+uv run src/predict_yolo.py \
+    --weights runs/<run>/weights/best.pt --split val
 
-Input: 1920×1080 | ERFNet model
+# Panoptic submission
+uv run src/submit_panoptic.py \
+    --weights runs/<run>/weights/best.pt --split test
+```
 
-| Model | Latency (ms) | FPS | Speedup |
-|-------|-------------|-----|---------|
-| PyTorch | 717.9 | 1.4 | 1.0× |
-| TensorRT FP32 | 309.3 | 3.2 | 2.3× |
-| TensorRT FP16 | 83.6 | 12.0 | 8.6× |
+### Validate Submission
+
+```bash
+uv run tools/validator.py --task semantics \
+    --phenobench_dir data/PhenoBench --zipfile <submission>.zip
+```
 
 ## Classes
 
@@ -103,6 +80,16 @@ Input: 1920×1080 | ERFNet model
 | Soil (background) | 0 | (0, 0, 0) |
 | Crop (sugarbeet) | 1 | (0, 255, 0) |
 | Weed | 2 | (255, 0, 0) |
+
+## Benchmark (Jetson Xavier NX)
+
+Input: 1920x1080 | ERFNet model
+
+| Model | Latency (ms) | FPS | Speedup |
+|-------|-------------|-----|---------|
+| PyTorch | 717.9 | 1.4 | 1.0x |
+| TensorRT FP32 | 309.3 | 3.2 | 2.3x |
+| TensorRT FP16 | 83.6 | 12.0 | 8.6x |
 
 ## License
 
